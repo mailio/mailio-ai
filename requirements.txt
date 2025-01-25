@@ -1,0 +1,16 @@
+pandas
+numpy
+ibmcloudant>=0.10.0
+nltk==3.9.1
+transformers==4.48.1
+torch==2.5.1
+python-dotenv==1.0.1
+tqdm==4.67.1
+python-dotenv==1.0.1
+dacite==1.8.1
+nbdev==2.3.34
+beautifulsoup4==4.12.3
+protobuf==5.29.3
+langchain_experimental==0.3.4
+semantic-router==0.0.72
+tiktoken
