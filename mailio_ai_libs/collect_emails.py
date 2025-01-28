@@ -54,8 +54,8 @@ def cleanup_sentence(sentence:str) -> str:
     Cleans up a sentence by removing special characters and extra spaces.
     """
     if sentence is not None:
-        sentence = re.sub(r'[^\w\s]', '', sentence)
         sentence = re.sub(r'\s+', ' ', sentence)
+        sentence = sentence.encode('ascii', 'ignore').decode()
         return sentence.strip()
     return sentence
 
@@ -75,12 +75,12 @@ def message_to_sentences(message_type: MessageType, message:str) -> Email:
             img_tag.decompose()  # Removes the <img> tag
         
         html = soup.get_text()
-        text = unicodedata.normalize('NFKD', html)
+        text = unicodedata.normalize('NFD', html)
 
         sentences = split_into_sentences(text)
         sentences = [cleanup_sentence(sentence) for sentence in sentences]
     else:
-        text = unicodedata.normalize('NFKD', message)
+        text = unicodedata.normalize('NFD', message)
         sentences = split_into_sentences(text)
         sentences = [cleanup_sentence(sentence) for sentence in sentences]
         
@@ -156,7 +156,7 @@ def extract_message_id(email):
     Extract the message ID from the email.
     Returns None if the email does not contain a message ID.
     """
-    return get_decoded_email_data(email, "messageId")
+    return email.get("_id", None)
 
 def extract_folder(email):
     """
@@ -209,9 +209,16 @@ def list_emails(folder:str, bookmark="", limit=10):
         s_name, s_email = extract_sender(doc)
         folder = extract_folder(doc)
         message_id = extract_message_id(doc)
+        if isinstance(subject, list):
+            subject = ".".join(filter(lambda s: s.strip(), subject))
+        if isinstance(message_id, list):
+            print("WTF?", message_id)
+            raise ValueError("Message ID is a list")
         created = extract_created(doc)
         sentences = message_to_sentences(message_type, message)
         email = Email(message_type=message_type, sentences=sentences, subject=subject, sender_name=s_name, sender_email=s_email, message_id=message_id, folder=folder, created=created)
+        
+
         emails.append(email)
         
     yield emails, last_emails.result["bookmark"]

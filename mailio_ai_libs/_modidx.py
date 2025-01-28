@@ -53,4 +53,8 @@ d = { 'settings': { 'branch': 'master',
                                                   'mailio_ai_libs.create_embeddings.Embedder.embed': ( 'create_embeddings.html#embedder.embed',
                                                                                                        'mailio_ai_libs/create_embeddings.py'),
                                                   'mailio_ai_libs.create_embeddings.Embedder.mean_pooling': ( 'create_embeddings.html#embedder.mean_pooling',
-                                                                                                              'mailio_ai_libs/create_embeddings.py')}}}
+                                                                                                              'mailio_ai_libs/create_embeddings.py')},
+            'mailio_ai_libs.semantic_search_evaluator': { 'mailio_ai_libs.semantic_search_evaluator.InformationRetrievalEvaluator': ( 'semantic_search_evaluation.html#informationretrievalevaluator',
+                                                                                                                                      'mailio_ai_libs/semantic_search_evaluator.py'),
+                                                          'mailio_ai_libs.semantic_search_evaluator.InformationRetrievalEvaluator.__init__': ( 'semantic_search_evaluation.html#informationretrievalevaluator.__init__',
+                                                                                                                                               'mailio_ai_libs/semantic_search_evaluator.py')}}}

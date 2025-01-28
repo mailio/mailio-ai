@@ -4,7 +4,7 @@
 __all__ = ['CustomEmbeddings', 'Chunker']
 
 # %% ../nbs/02_chunking.ipynb 1
-from langchain_text_splitters import TokenTextSplitter
+from langchain_text_splitters import TokenTextSplitter, SentenceTransformersTokenTextSplitter
 from transformers import PreTrainedModel, PreTrainedTokenizer
 from langchain_core.embeddings import Embeddings
 from transformers import AutoTokenizer, AutoModel
@@ -40,10 +40,11 @@ class CustomEmbeddings:
 class Chunker:
     def __init__(self, tokenizer: PreTrainedTokenizer, chunk_size:int=250, chunk_overlap:int=0):
         # self.chunker = SemanticChunker(embeddings=custom_embeddings, breakpoint_threshold_type=threshold_type, breakpoint_threshold_amount=threshold_amount)
-        self.chunker = TokenTextSplitter.from_huggingface_tokenizer(tokenizer=tokenizer, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        # self.chunker = TokenTextSplitter.from_huggingface_tokenizer(tokenizer=tokenizer, chunk_size=chunk_size, chunk_overlap=chunk_overlap, keep_whitespace=True)
+        self.chunker = SentenceTransformersTokenTextSplitter.from_huggingface_tokenizer(tokenizer=tokenizer, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     
     def chunk(self, text:str):
-        chunks = self.chunker.create_documents([text])
+        chunks = self.chunker.split_text(text)
         return chunks
 
 

@@ -7,13 +7,20 @@ __all__ = ['Embedder']
 from typing import List, Optional
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizer, BatchEncoding
-from transformers import AutoTokenizer, DistilBertModel
+from transformers import AutoTokenizer, AutoModel
+from sentence_transformers.models import Pooling
 import sys
+import os
+import json
+import numpy as np
+import time
+from tqdm.auto import tqdm
 import torch.nn.functional as F
 
 sys.path.append("..")  # Adds the parent directory to sys path
 
 from .chunking import Chunker
+from data_types.email import Email, MessageType
 
 # %% ../nbs/02_create_embeddings.ipynb 2
 class Embedder:
@@ -43,7 +50,7 @@ class Embedder:
 
         input_texts = []
         for ch in chunks:
-            input_texts.append(ch.page_content)
+            input_texts.append(ch)
         
         inputs = self.tokenizer(input_texts, padding=True, truncation=True, return_tensors="pt")
         inputs = inputs.to(self.model.device)
@@ -52,18 +59,17 @@ class Embedder:
             # Forward pass
             outputs = self.model(**inputs)
         
-        #TODO! remove the mean pooling. Might not be harmful for quality of results
-        # Perform pooling. This will convert the output to a tensor of shape (batch_size, hidden_size)
-        pooled_output = self.mean_pooling(outputs, inputs['attention_mask'])
+        # Perform pooling.
+        sentence_embeddings = self.mean_pooling(outputs, inputs['attention_mask'])
 
-        norm = F.normalize(pooled_output, p=2, dim=1)
-            
         # Convert to numpy array and return
         # Move tensors in the list to CPU and convert them to numpy arrays
-        return [norm.cpu().numpy()]
+        return sentence_embeddings.cpu().numpy()
 
+        #Mean Pooling - Take attention mask into account for correct averaging
     def mean_pooling(self, model_output, attention_mask):
         token_embeddings = model_output[0] #First element of model_output contains all token embeddings
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
 

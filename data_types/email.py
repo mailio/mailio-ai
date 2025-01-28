@@ -26,4 +26,10 @@ class Email:
 
     @classmethod
     def from_dict(cls, data: dict):
-        return from_dict(data_class=cls, data=data, config=Config(cast=[MessageType]))
+        config = Config(
+            cast=[MessageType], 
+            strict=True, 
+            check_types=True
+        )
+
+        return from_dict(data_class=cls, data=data, config=config)
