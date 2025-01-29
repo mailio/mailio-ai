@@ -17,12 +17,16 @@ import time
 from tqdm.auto import tqdm
 import torch.nn.functional as F
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 sys.path.append("..")  # Adds the parent directory to sys path
 
 from .chunking import Chunker
 from data_types.email import Email, MessageType
 
-# %% ../nbs/02_create_embeddings.ipynb 2
+# %% ../nbs/02_create_embeddings.ipynb 3
 class Embedder:
 
     def __init__(self, model: PreTrainedModel, tokenizer: PreTrainedTokenizer):
@@ -68,7 +72,7 @@ class Embedder:
 
         #Mean Pooling - Take attention mask into account for correct averaging
     def mean_pooling(self, model_output, attention_mask):
-        token_embeddings = model_output[0] #First element of model_output contains all token embeddings
+        token_embeddings = model_output.last_hidden_state
         input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
         return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 

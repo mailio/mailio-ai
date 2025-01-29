@@ -173,5 +173,11 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# ignore data dir
-data/*
+# Ignore data/ directory in any subfolder
+**/data/
+
+# Ignore .env files in any subfolder
+**/.env
+
+.DS_Store
+.vscode/

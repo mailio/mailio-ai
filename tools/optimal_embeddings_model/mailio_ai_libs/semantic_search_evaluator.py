@@ -13,12 +13,16 @@ from torch import Tensor
 import logging
 import torch
 import torch.nn.functional as F
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-# %% ../nbs/05_semantic_search_evaluation.ipynb 8
+# %% ../nbs/05_semantic_search_evaluation.ipynb 9
 class SimilarityFunction(Enum):
     COSINE = "cosine"
     DOT_PRODUCT = "dot"
@@ -120,6 +124,25 @@ class MailioInformationRetrievalEvaluator:
                 s = scores.cpu().numpy().ravel()
                 i = indices.cpu().numpy().ravel()
                 query_results[query_index] = [(s, i) for s, i in zip(s, i)]
+        
+        if similarity_function == SimilarityFunction.DOT_PRODUCT:
+            for query_index in range(len(self.query_embeddings)):
+                query_embedding = self.query_embeddings[query_index]
+                similarity = torch.matmul(self.corpus_embeddings, query_embedding)
+                scores, indices = similarity.topk(top_k, dim=0)
+                s = scores.cpu().numpy().ravel()
+                i = indices.cpu().numpy().ravel()
+                query_results[query_index] = [(s, i) for s, i in zip(s, i)]
+
+        if similarity_function == SimilarityFunction.EUCLIDEAN:
+            for query_index in range(len(self.query_embeddings)):
+                query_embedding = self.query_embeddings[query_index]
+                similarity = torch.cdist(query_embedding.unsqueeze(0), self.corpus_embeddings, p=2).squeeze()
+                scores, indices = similarity.topk(top_k, dim=0, largest=False)
+                s = scores.cpu().numpy().ravel()
+                i = indices.cpu().numpy().ravel()
+                query_results[query_index] = [(s, i) for s, i in zip(s, i)]
+
                 
         return query_results    
 
@@ -145,7 +168,8 @@ class MailioInformationRetrievalEvaluator:
         # Compute scores on results
         for query_index, results in queries_results.items():
             # Sort scores (probably unecessary but just in case)
-            top_hits = sorted(results, key=lambda x: x[0], reverse=True)
+            # top_hits = sorted(results, key=lambda x: x[0], reverse=True)
+            top_hits = results
 
             relevant_docs_ids = self.ground_truth[query_index]
             # Accuracy@k - We count the result correct, if at least one relevant doc is across the top-k documents
@@ -211,7 +235,6 @@ class MailioInformationRetrievalEvaluator:
 
         for k in MRR:
             MRR[k] /= len(self.query_embeddings)
-            MRR[k] = 1/MRR[k]
 
         for k in ndcg:
             ndcg[k] = np.mean(ndcg[k])
@@ -247,9 +270,9 @@ class MailioInformationRetrievalEvaluator:
             logger.info("MRR@{}: {:.4f} rank from top".format(k, scores["mrr@k"][k]))
 
         for k in scores["ndcg@k"]:
-            logger.info("NDCG@{}: {:.4f}% as good as ideal ranking".format(k, scores["ndcg@k"][k] * 100))
+            logger.info("NDCG@{}: {:.4f}%".format(k, scores["ndcg@k"][k] * 100))
 
         for k in scores["map@k"]:
-            logger.info("MAP@{}: {:.4f}".format(k, scores["map@k"][k]))
+            logger.info("MAP@{}: {:.4f} relevant to query".format(k, scores["map@k"][k] * 100))
     
 
