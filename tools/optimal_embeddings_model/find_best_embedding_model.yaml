@@ -8,7 +8,7 @@ force_embedding_creation: False
 evaluation_dataset: data/evaluation_dataset/sample_queries_cleaned.jsonl
 
 # output evaluation results file
-results_output: data/results.jsonl
+results_output: explore/results.jsonl
 
 # list of models to compare
 models:
@@ -16,6 +16,7 @@ models:
   - sentence-transformers/multi-qa-mpnet-base-dot-v1
   - thenlper/gte-base
   - intfloat/e5-small-v2
+  - distilbert/distilbert-base-uncased
 
 # list of cross-encoders to experiment with re-ranking (tbd)
 cross-encoders:

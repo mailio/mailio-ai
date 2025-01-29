@@ -181,3 +181,5 @@ cython_debug/
 
 .DS_Store
 .vscode/
+
+**/explore/results.jsonl

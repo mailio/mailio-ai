@@ -18,6 +18,7 @@ import argparse
 
 # mailio ai libs imports
 from mailio_ai_libs.create_embeddings import Embedder
+from data_types.email import Email
 from mailio_ai_libs.semantic_search_evaluator import MailioInformationRetrievalEvaluator, SimilarityFunction
 
 # load .env file
@@ -84,7 +85,7 @@ def create_embeddings(embedder: Embedder, files:List, output_folder:str, force_e
 
     # create embeddings
     for file in files:
-        with open(os.path.join(data_dir, file), 'r') as f:
+        with open(file, 'r') as f:
             jsonl = f.read()
 
         data = jsonl.split('\n')
@@ -205,6 +206,13 @@ def main(config):
         logger.error(f"Missing required configuration settings: {', '.join(missing_settings)}")
         sys.exit(1)
 
+    # list all jsonl files from the "traning" set
+    # Get full paths of all .jsonl files in the directory
+    files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".jsonl") and os.path.isfile(os.path.join(data_dir, f))]
+    if len(files) == 0:
+        logger.error(f"No jsonl files found in {data_dir}")
+        sys.exit(1)
+
     results = []
 
     for model_id in models:
@@ -215,12 +223,6 @@ def main(config):
 
         # initialize the embedder
         embedder = Embedder(model, tokenizer)
-
-        # list all jsonl files from the "traning" set
-        files = [f for f in os.listdir(data_dir) if f.endswith(".jsonl") and os.path.isfile(os.path.join(data_dir, f))]
-        if len(files) == 0:
-            logger.error(f"No jsonl files found in {data_dir}")
-            sys.exit(1)
 
         output_subfolder = model_id.split("/")[-1]
         output_folder = f"{data_dir}/{output_subfolder}"
