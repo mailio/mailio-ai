@@ -1,0 +1,5 @@
+.venv
+.vscode
+deployment.yaml
+Dockerfile
+config.yaml

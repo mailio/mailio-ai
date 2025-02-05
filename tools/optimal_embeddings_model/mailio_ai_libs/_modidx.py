@@ -71,4 +71,6 @@ d = { 'settings': { 'branch': 'master',
                                                           'mailio_ai_libs.semantic_search_evaluator.MailioInformationRetrievalEvaluator.run': ( 'semantic_search_evaluation.html#mailioinformationretrievalevaluator.run',
                                                                                                                                                 'mailio_ai_libs/semantic_search_evaluator.py'),
                                                           'mailio_ai_libs.semantic_search_evaluator.SimilarityFunction': ( 'semantic_search_evaluation.html#similarityfunction',
-                                                                                                                           'mailio_ai_libs/semantic_search_evaluator.py')}}}
+                                                                                                                           'mailio_ai_libs/semantic_search_evaluator.py'),
+                                                          'mailio_ai_libs.semantic_search_evaluator.load_database_from_jsonl': ( 'semantic_search_evaluation.html#load_database_from_jsonl',
+                                                                                                                                 'mailio_ai_libs/semantic_search_evaluator.py')}}}
