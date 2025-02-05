@@ -44,7 +44,7 @@ jwt:
   system_password: abcdef
 
 
-embedding_model: intfloat/e5-large-v2
+embedding_model: jinaai/jina-embeddings-v3
 
 couchdb:
   host: http://localhost:5984
@@ -57,9 +57,6 @@ pinecone:
   cloud: aws
   region: us-east-1
   metric: cosine
-
-ai:
-  embedding_model: jinaai/jina-embeddings-v3
 
 redis:
   host: localhost
