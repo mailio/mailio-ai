@@ -126,8 +126,8 @@ class CouchDBService:
         Returns:
             List[dict]: The messages
         """
-        if not ids:
-            raise ValueError("Invalid message IDs")
+        if len(ids) == 0:
+            return []
         
         messages = []
         doc_ids = []
@@ -154,17 +154,6 @@ class CouchDBService:
             if e.status_code == 401 or e.status_code == 403:
                 raise UnauthorizedError
             raise e
-            # try:
-            #     message = self.client.get_document(_id).get_result()
-            #     email = self.message_to_email(message)
-            #     messages.append(email)
-            # except ApiException as e:
-            #     if e.status_code == 404:
-            #         continue
-            #     if e.status_code == 401 or e.status_code == 403:
-            #         raise UnauthorizedError
-                
-            #     raise InvalidUsageError
 
         return messages
 

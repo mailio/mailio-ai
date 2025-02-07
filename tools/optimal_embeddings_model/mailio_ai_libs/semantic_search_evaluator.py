@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-# %% ../nbs/05_semantic_search_evaluation.ipynb 9
+# %% ../nbs/05_semantic_search_evaluation.ipynb 8
 class SimilarityFunction(Enum):
     COSINE = "cosine"
     DOT_PRODUCT = "dot"
@@ -324,7 +324,7 @@ class MailioInformationRetrievalEvaluator:
     
 
 
-# %% ../nbs/05_semantic_search_evaluation.ipynb 11
+# %% ../nbs/05_semantic_search_evaluation.ipynb 10
 def load_database_from_jsonl(files:List[str]) -> pd.DataFrame:
     df = pd.DataFrame()
     for file in files:

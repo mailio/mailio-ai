@@ -36,8 +36,45 @@ class Embedder:
         self.tokenizer = tokenizer
         self.max_length = self.model.config.max_position_embeddings  # Model-specific max lengt
         self.chunker = Chunker(tokenizer, chunk_size=self.max_length-2, chunk_overlap=0)
+
+    def batch_embed(self, documents:List[List[str]]) -> np.ndarray:
+        """
+        Generate embeddings for a list of documents.
+        """
+        all_chunks = []          # To hold all text chunks for every document.
+        doc_chunk_counts = []    # To record how many chunks each document produced.
+        
+        # Loop over each document (which is a list of strings).
+        for doc in documents:
+            # Join the list of strings into one text, and then chunk it.
+            text = ". ".join(doc)
+            chunks = self.chunker.chunk(text)
+            doc_chunk_counts.append(len(chunks))
+            all_chunks.extend(chunks)
+        
+        # Batch tokenize all chunks at once.
+        inputs = self.tokenizer(all_chunks, padding=True, truncation=True, return_tensors="pt")
+        inputs = inputs.to(self.model.device)
+        
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+        
+        # Get embeddings for each chunk.
+        chunk_embeddings = self.mean_pooling(outputs, inputs['attention_mask'])
+        
+        # Now, regroup the chunk embeddings back into document embeddings.
+        doc_embeddings = []
+        index = 0
+        for count in doc_chunk_counts:
+            # For each document, you can aggregate its chunk embeddings (here we take the mean).
+            doc_emb = chunk_embeddings[index:index+count].mean(dim=0)
+            doc_embeddings.append(doc_emb)
+            index += count
     
-    def embed(self, text:List[str]) -> torch.Tensor:
+        # Return the final document embeddings as a numpy array.
+        return torch.stack(doc_embeddings).cpu().numpy()
+    
+    def embed(self, text:List[str]) -> np.ndarray:
         """
         Generate embeddings for a list of texts.
         

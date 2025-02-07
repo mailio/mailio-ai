@@ -3,6 +3,7 @@ from pinecone import ServerlessSpec
 from typing import Dict, List
 from pinecone.data.index import QueryResponse
 import threading
+from urllib.parse import urlparse
 
 class PineconeService:
 
@@ -20,7 +21,7 @@ class PineconeService:
 
     @classmethod
     def get_instance(cls, cfg: Dict, dimension: int = 1024):
-        return cls(cfg)
+        return cls(cfg, dimension=dimension)
 
     def _initialize(self, cfg: Dict, dimension: int = 1024, metric: str = 'cosine'):
         """
@@ -46,7 +47,11 @@ class PineconeService:
 
         # get index name from the host url and remove the -index suffix
         name = pinecone_cfg.get("index_name")
-        name = name.split("-")[0]
+        parsed_url = urlparse(name)
+        name = parsed_url.netloc
+        name = name.split(".")[0]
+        parts = name.rsplit("-", 1) 
+        name = parts[0]
         self.index_name = name
 
         self.pc = Pinecone(api_key=pinecone_cfg.get("api_key"))

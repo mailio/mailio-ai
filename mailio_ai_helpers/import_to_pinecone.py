@@ -2,7 +2,7 @@
 
 # %% auto 0
 __all__ = ['project_root', 'DEFAULT_FOLDERS', 'load_config', 'connect_pinecone', 'get_db_name', 'connect_couchdb',
-           'load_embedder', 'import_to_pinecode', 'main']
+           'load_embedding_service', 'import_to_pinecode', 'main']
 
 # %% ../nbs/import_to_pinecone.ipynb 1
 import yaml
@@ -21,14 +21,16 @@ import torch.nn.functional as F
 import torch
 import numpy as np
 import argparse
+import time 
 
 project_root = os.path.abspath(os.path.join(os.getcwd(), '..'))
 sys.path.append(project_root)
 
 from tools.optimal_embeddings_model.mailio_ai_libs.collect_emails import list_emails
-from tools.optimal_embeddings_model.mailio_ai_libs.create_embeddings import Embedder
+from tools.optimal_embeddings_model.data_types.email import Email, MessageType
+from api.services.embedding_service import EmbeddingService
 
-# %% ../nbs/import_to_pinecone.ipynb 3
+# %% ../nbs/import_to_pinecone.ipynb 2
 def load_config(path:str) -> Dict:
     with open(path, 'r') as f:
         config = yaml.safe_load(f)
@@ -56,29 +58,31 @@ def connect_couchdb(cfg:Dict) -> CloudantV1:
 
 # %% ../nbs/import_to_pinecone.ipynb 6
 # load transformers model
-def load_embedder(cfg: Dict) -> Embedder:
-    model_id = cfg.get("ai").get("embedding_model")
-    print(f"Loading model {model_id}")
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    model = AutoModel.from_pretrained(model_id)
+def load_embedding_service(cfg: Dict) -> EmbeddingService:
+    embedding_service = EmbeddingService(cfg)
+    return embedding_service
+    # model_id = cfg.get("ai").get("embedding_model")
+    # print(f"Loading model {model_id}")
+    # tokenizer = AutoTokenizer.from_pretrained(model_id)
+    # model = AutoModel.from_pretrained(model_id)
 
-    device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
-    print(f"device: {device}")
-    model.to(device)
+    # device = "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    # print(f"device: {device}")
+    # model.to(device)
 
-    embedder = Embedder(model, tokenizer)
-    return embedder
+    # embedder = Embedder(model, tokenizer)
+    # return embedder
 
 # %% ../nbs/import_to_pinecone.ipynb 7
 # default folders for import
-DEFAULT_FOLDERS = ["archive", "sent"]
+DEFAULT_FOLDERS = ["inbox", "goodreads", "archive", "sent"]
 
-def import_to_pinecode(client, index, embedder:Embedder, user_db: str, address:str, folders: str, batch_size:int = 500):
+def import_to_pinecode(client, index, embedding_service:EmbeddingService, user_db: str, address:str, folders: str, batch_size:int = 500):
     """
     Import emails from couchdb to pinecone index
     Args:
         client: CloudantV1 client
-        embedder: Embedder object
+        embedding_service: EmbeddingService object
         user_db: user db name
         folders: list of folders to import
         batch_size: batch size for import
@@ -98,24 +102,17 @@ def import_to_pinecode(client, index, embedder:Embedder, user_db: str, address:s
                 # prepare data for import
                 vectors = []
                 for e in tqdm(emails, desc=f"Importing {folder}", unit="email"):
-                    sentences = []
-                    if e.subject:
-                        sentences.append(e.subject)
-                    sentences.extend(e.sentences)
-
                     metadata = {
                         "created": e.created,
                         "from": e.sender_email,
                         "from_name": e.sender_name,
                         "folder": e.folder,
                     }
-                    text = " ".join(sentences)
-
-                    if not text.strip():
-                        print(f"Empty email {e.message_id}, subject: {e.subject}, text: {text}, from: {e.sender_email}")    
-                        continue
-
-                    embedding = embedder.embed(text)
+                    
+                    before = time.time()
+                    embedding = embedding_service.create_embedding(e)
+                    after = time.time()
+                    print(f"Time to embed: {after - before}")
 
                     vector = {
                         "id": e.message_id,
@@ -140,9 +137,9 @@ def main(address:str):
     cfg = load_config('../config.yaml')
     client = connect_couchdb(cfg)
     index = connect_pinecone(cfg)
-    embedder = load_embedder(cfg)
+    embedding_service = load_embedding_service(cfg)
     user_db = get_db_name(address)
-    import_to_pinecode(client, index, embedder, user_db, address, DEFAULT_FOLDERS)
+    import_to_pinecode(client, index, embedding_service, user_db, address, DEFAULT_FOLDERS)
 
 # %% ../nbs/import_to_pinecone.ipynb 12
 if __name__ == "__main__":

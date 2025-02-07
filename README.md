@@ -76,6 +76,11 @@ To start using Mailio AI, run the main script:
 uvicorn main:app --reload
 ```
 
+To start with fastapi dev server:
+```bash
+fastapi dev main.py
+```
+
 Setup `VSCode` or `Cursor`: 
 
 ```
