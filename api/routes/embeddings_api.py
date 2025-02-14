@@ -15,22 +15,6 @@ from typing import List
 
 router = APIRouter()
 
-def create_metadata(email: Email):
-    """
-    Create metadata for the email (helper method)
-    """
-    if email.created is None:
-        raise InvalidUsage("Email created date is missing")
-    if email.folder is None:
-        raise InvalidUsage("Email folder is missing")
-    metadata = {
-        "created": email.created,
-        "folder": email.folder,
-        "from_name": email.sender_name,
-        "from": email.sender_email,
-    }
-    return metadata
-
 @router.post("/api/v1/embedding/{address}/message/{message_id}", response_model=EmbeddingResponse, response_model_exclude_none=True) 
 async def upsert_embedding_by_message_id(
     message_id: str,
@@ -43,25 +27,11 @@ async def upsert_embedding_by_message_id(
     """
     Upsert email embedding by message ID
     """
-    email = couchdb_service.get_message_by_id(message_id, address)
-    if email is None:
-        raise HTTPException(status_code=404, detail="Email not found")
-    metadata = create_metadata(email)
-    embeddings = embedding_service.create_embedding(email)
-    embedding_task_queue.upsert_embedding(address, message_id, embeddings[0].tolist(), metadata)
+
+    embedding_task_queue.upsert_embedding(address, message_id)
 
     return EmbeddingResponse(
         address=address,
-        matches=[EmbeddingMatch(
-            message_id=message_id,
-            created=metadata.get("created", None),
-            metadata=EmbeddingMetadata(
-                subject=email.subject,
-                folder=metadata.get("folder", None),
-                from_email=metadata.get("from", None),
-                from_name=metadata.get("from_name", None)
-            )
-        )],
         model=embedding_service.embedding_model
     )
 
@@ -93,32 +63,33 @@ async def upsert_embedding(
             raise ValueError("Invalid vector type")
         
         metadata = body.metadata.dict()
-        metadata.pop("vector", None) # remove vector from metadata
+        del metadata["vector"]
 
-        # damn...didn't notice from is reserved keyword
-        from_name = metadata.get("from_name", None)
-        metadata.pop("from_name", None) 
-        if from_name is not None:
-            metadata["from"] = from_name
+        # remove None values from metadata
+        metadata = {k: v for k, v in metadata.items() if v is not None}
         
-        embedding_task_queue.upsert_embedding(body.address, body.message_id, request_vector, metadata)
+        # get the email from the database
+        message = couchdb_service.get_raw_message_by_id(body.message_id, body.address)
+        if message is None:
+            raise ValueError(f"Email not found for message_id: {message_id}, address: {address}")
+
+        # preventing multiple inserts, skip adding to index if already exists
+        if message.get("search", False):
+            return EmbeddingResponse(
+                address=body.address,
+                model=embedding_service.embedding_model
+            )
+
+        pinecone_service.upsert(body.address, body.message_id, request_vector, metadata)
+        
+        # if upsert successfull 
+        message["search"] = True
+        couchdb_service.put_message(message, body.address)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    matches = []
-    matches.append(EmbeddingMatch(
-        message_id=body.message_id,
-        created=metadata.get("created", None),
-        metadata=EmbeddingMetadata(
-            subject=metadata.get("subject", None),
-            folder=metadata.get("folder", None),
-            from_email=metadata.get("from", None),
-            from_name=metadata.get("from_name", None)
-        )
-    ))
     return EmbeddingResponse(
         address=body.address,
-        matches=matches,
         model=embedding_service.embedding_model
     )
 
@@ -157,18 +128,26 @@ async def query_embedding(
     
     # retrieve all document by id from the couch database (for display purposes)
     emails = couchdb_service.get_bulk_by_id(address, all_ids)
-    email_dict = {email.message_id: email for email in emails}
+    email_dict = {email.message_id: email for email in emails if email is not None}
 
     for match in matches:
+        match_id = match.id.replace("+", " ") # i don't know what exactly couchdb does but i know it doesn't like + in there
         metadata = match.metadata or {}
+        # check if match_id is in the email_dict
+        subject = None
+        if match_id not in email_dict:
+            subject = metadata.get("subject", None)
+        else:
+            subject = email_dict[match_id].subject
+
         output_matches.append(EmbeddingMatch(
             message_id=match.id,
             score=match.score,
             created=metadata.get("created", None),
             metadata=EmbeddingMetadata(
-                subject=email_dict[match.id].subject,
+                subject=subject,
                 folder=metadata.get("folder", None),
-                from_email=metadata.get("from", None),
+                from_email=metadata.get("from_email", None),
                 from_name=metadata.get("from_name", None),
             )
         ))

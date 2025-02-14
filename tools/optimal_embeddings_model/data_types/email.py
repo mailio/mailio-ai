@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from dacite import from_dict, Config
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 # Custom encoder function for JSON serialization
 def json_encoder(obj):
@@ -33,3 +33,7 @@ class Email:
         )
 
         return from_dict(data_class=cls, data=data, config=config)
+
+    def to_dict(cls) -> Dict[str, Any]:
+        """Convert the Email instance to a dictionary, ensuring proper Enum serialization."""
+        return asdict(cls, dict_factory=lambda x: {k: (v.value if isinstance(v, Enum) else v) for k, v in x})

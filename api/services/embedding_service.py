@@ -2,12 +2,14 @@ from transformers import AutoTokenizer, AutoModel
 from tools.optimal_embeddings_model.data_types.email import Email, MessageType
 from tools.optimal_embeddings_model.mailio_ai_libs.create_embeddings import Embedder
 import torch
-from typing import List
+from typing import List, Dict
+import threading
 
 class EmbeddingService:
     """
     Embedding service to get embeddings for the email
     """
+    
     def __init__(self, cfg: dict):
         """
         Initialize the Embedding service

@@ -104,7 +104,7 @@ def import_to_pinecode(client, index, embedding_service:EmbeddingService, user_d
                 for e in tqdm(emails, desc=f"Importing {folder}", unit="email"):
                     metadata = {
                         "created": e.created,
-                        "from": e.sender_email,
+                        "from_email": e.sender_email,
                         "from_name": e.sender_name,
                         "folder": e.folder,
                     }

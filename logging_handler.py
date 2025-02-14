@@ -3,10 +3,17 @@ import json
 import sys
 import os
 
+logger = None
+
 def use_logginghandler():
-    logger = logging.getLogger()
-    logger.setLevel("INFO")
+    global logger
+    if logger is not None:
+        return logger
+        
+    l = logging.getLogger()
+    l.setLevel("INFO")
     handler = logging.StreamHandler(sys.stdout)
-    logger.addHandler(handler)
+    l.addHandler(handler)
+    logger = l
     return logger
     

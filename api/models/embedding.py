@@ -17,7 +17,7 @@ class EmbeddingMatch(BaseModel):
 
 class EmbeddingResponse(BaseModel):
     address: str
-    matches: List[EmbeddingMatch]
+    matches: Optional[List[EmbeddingMatch]] = None
     model: Optional[str] = None
 
 class EmbeddingRequest(BaseModel):

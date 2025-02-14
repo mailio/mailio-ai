@@ -20,6 +20,7 @@ import unicodedata
 from bs4 import BeautifulSoup
 import re
 from typing import List, Optional
+import email.utils as email_parser_utils
 
 project_root = os.path.abspath(os.path.join(os.getcwd(), '../../..'))
 sys.path.append(project_root)
@@ -136,8 +137,16 @@ def extract_sender(email):
     Returns None if the email does not contain a sender.
     """
     from_sender = get_decoded_email_data(email, "from")
-    name = from_sender.get("Name") if from_sender and "Name" in from_sender else None
+    if from_sender is None:
+        raise ValueError("No sender email found in the email")
+    
     address = from_sender.get("Address") if from_sender and "Address" in from_sender else None
+    if address is None:             
+        # try to parse the email address
+        name, address = email_parser_utils.parseaddr(from_sender)
+        return name, address
+    
+    name = from_sender.get("Name") if from_sender and "Name" in from_sender else None
     return name, address
 
 def extract_message_id(email):

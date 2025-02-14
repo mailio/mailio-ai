@@ -1,51 +1,46 @@
 from typing import Dict, List
-from rq import Queue, Worker
+from rq import Queue, Worker, Retry
 from redis import Redis
 from api.services.pinecone_service import PineconeService
+from api.services.couchdb_service import CouchDBService
+from api.services.embedding_service import EmbeddingService
 import logging
 from logging_handler import use_logginghandler
 import signal
+import sys
+from tools.optimal_embeddings_model.data_types.email import Email
+import os
+import json
+import time
+
+CONFIG_PATH = os.getenv("CONFIG_PATH", "config.yaml")
+from config import cfg, get_config
 
 use_logginghandler()
 
-def create_embedding(address:str, message_id:str , metadata: Dict, vector: List[float], cfg:Dict, dimension:int):
-    # create an embedding from a message id
-    pc_service = PineconeService.get_instance(cfg, dimension=dimension)
-    try:
-        # remove from metadata all fields with None 
-        metadata = {k: v for k, v in metadata.items() if v is not None}
-        pc_service.upsert(address, message_id, vector, metadata)
-    except Exception as e:
-        logging.error(f"Error upserting embedding for message_id: {message_id}, address: {address}, error: {e}")
-        raise e
+cfg = get_config()
+REDIS_QUEUE = "default_embedding_queue"
+REDIS_PROCESSING_QUEUE = "embedding_processing_queue"
+MAX_RETRIES = 3
+RETRY_DELAY = 5 # seconds delay before re-queuing failed task
 
-class EmbeddingTaskQueue:
-    def __init__(self, cfg: Dict, dimension: int = 1024):
-        redis_cfg = cfg.get("redis")
-        if redis_cfg is None:
-            raise ValueError("Redis configuration is missing")
-        redis_host = redis_cfg.get("host")
-        redis_port = redis_cfg.get("port")
-        redis_db = redis_cfg.get("db")
-        username = redis_cfg.get("username")
-        password = redis_cfg.get("password")
-        # check if any of the settings are missing
-        if redis_host is None:
-            raise ValueError("Redis host is missing")
-        if redis_port is None:
-            raise ValueError("Redis port is missing")
-        if redis_db is None:
-            raise ValueError("Redis db is missing")
-        redisConnection = Redis(host=redis_host, port=redis_port, db=redis_db, username=username, password=password)
-        self.redis_conn = redisConnection
-        self.dimension = dimension
-        self.cfg = cfg
-        self.queue = Queue("default_embedding_queue", connection=redisConnection)
+def create_metadata(email: Email):
+    """
+    Create metadata for the email (helper method)
+    """
+    if email.created is None:
+        raise ValueError("Email created date is missing")
+    if email.folder is None:
+        raise ValueError("Email folder is missing")
+    metadata = {
+        "created": email.created,
+        "folder": email.folder,
+        "from_name": email.sender_name,
+        "from_email": email.sender_email,
+    }
+    return metadata
 
-    def upsert_embedding(self, address, message_id, vector, metadata):
-        job = self.queue.enqueue(create_embedding, address, message_id, metadata, vector, self.cfg, self.dimension)
-    
-def start_embedding_worker(queues:List[str], cfg:Dict):
+def init_redis(cfg: Dict):
     redis_cfg = cfg.get("redis")
     if redis_cfg is None:
         raise ValueError("Redis configuration is missing")
@@ -61,22 +56,76 @@ def start_embedding_worker(queues:List[str], cfg:Dict):
         raise ValueError("Redis port is missing")
     if redis_db is None:
         raise ValueError("Redis db is missing")
-    redis_conn = Redis(host=redis_host, port=redis_port, db=redis_db, username=username, password=password)
+    redisConnection = Redis(host=redis_host, port=redis_port, db=redis_db, username=username, password=password)
+    return redisConnection
 
-    worker = Worker(queues, connection=redis_conn)
+def create_embedding(cfg:Dict):
+    # create an embedding from a message id
+    db_service = CouchDBService(cfg)
+    embedding_service = EmbeddingService(cfg)
+    pc_service = PineconeService(cfg, dimension=embedding_service.model.config.hidden_size)
 
-    def handle_shutdown(signum, frame):
-        """Graceful shutdown handler."""
-        print(f"Received shutdown signal {signum}, stopping worker...")
-        worker.stop()  # Stop the worker loop
-        redis_conn.close()  # Close Redis connection
-        sys.exit(0)  # Exit cleanly
+    r = init_redis(cfg)
 
-    # Register signal handlers
-    signal.signal(signal.SIGTERM, handle_shutdown)
-    signal.signal(signal.SIGINT, handle_shutdown)
+    while True:
+        try:
+            # move from queue to processing queue
+            task = r.brpoplpush(REDIS_QUEUE, REDIS_PROCESSING_QUEUE) # block on empty queue
+            if task:
+                try:
+                    task_data = json.loads(task)
+                    message_id = task_data.get("message_id")
+                    address = task_data.get("address")
+                    retry_count = task_data.get("retry_count", 0)
 
-    try:
-        worker.work()
-    except KeyboardInterrupt:
-        handle_shutdown(signal.SIGINT, None)
+                    if message_id is None or address is None:
+                        raise ValueError("Message ID or address is missing")
+
+                    message, email = db_service.get_message_by_id(message_id, address)
+                    if email is None:
+                        raise ValueError(f"Email not found for message_id: {message_id}, address: {address}")
+
+                    metadata = create_metadata(email)
+                    vector = embedding_service.create_embedding(email)
+
+                    # remove from metadata all fields with None 
+                    metadata = {k: v for k, v in metadata.items() if v is not None}
+                    pc_service.upsert(address, message_id, vector[0].tolist(), metadata)
+
+                    # after successfull upsert, update the message with flag: search: true
+                    message["search"] = True
+                    db_service.put_message(message, address)
+                    r.lrem(REDIS_PROCESSING_QUEUE, 1, task)
+                    logging.info(f"Successfully upserted embedding for message_id: {message_id}, address: {address}")
+                except Exception as e:
+                    logging.error(f"Error processing message_id: {message_id}, address: {address}, error: {e}")
+                    # if error, requeue the message
+                    if retry_count >= MAX_RETRIES:
+                        logging.error(f"Max retries reached for message_id: {message_id}, address: {address}")
+                    else:
+                        task_data["retry_count"] = retry_count + 1
+                        time.sleep(RETRY_DELAY)
+                        r.rpush(REDIS_QUEUE, json.dumps(task_data))
+                        logging.info(f"Requeued message_id: {message_id}, address: {address}")
+
+        except Exception as e:
+            logging.error(f"error in processing queue {e}")
+            raise e
+
+class EmbeddingTaskQueue:
+    def __init__(self, cfg: Dict, dimension: int = 1024):
+        self.redis_conn = init_redis(cfg)
+        self.dimension = dimension
+        self.cfg = cfg
+
+    def upsert_embedding(self, address, message_id):
+        """
+        Upsert an embedding to the queue
+        """
+        payload = {
+            "address": address,
+            "message_id": message_id,
+            "retry_count": 0   
+        }
+        p = json.dumps(payload)
+        self.redis_conn.rpush(REDIS_QUEUE, p)

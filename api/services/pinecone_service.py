@@ -7,23 +7,7 @@ from urllib.parse import urlparse
 
 class PineconeService:
 
-    _instance = None # singleton instance
-    _lock = threading.Lock() # lock to ensure thread safety
-
-    def __new__(cls, cfg: Dict, dimension: int = 1024, metric: str = "cosine"):
-        """Ensures only one instance of PineconeService exists."""
-        if not hasattr(cls, "_instance") or cls._instance is None:
-            with cls._lock:  # Ensures thread-safety
-                if cls._instance is None:  # Double-check locking
-                    cls._instance = super(PineconeService, cls).__new__(cls)
-                    cls._instance._initialize(cfg, dimension, metric)
-        return cls._instance
-
-    @classmethod
-    def get_instance(cls, cfg: Dict, dimension: int = 1024):
-        return cls(cfg, dimension=dimension)
-
-    def _initialize(self, cfg: Dict, dimension: int = 1024, metric: str = 'cosine'):
+    def __init__(self, cfg: Dict, dimension: int = 1024, metric: str = 'cosine'):
         """
         Initialize the Pinecone service
         Args:
@@ -119,7 +103,7 @@ class PineconeService:
             query_filter["created"] = {"$gte": afterTimestamp}
         
         if from_email:
-            query_filter["from"] = {"sender_email": { "$eq": from_email}}
+            query_filter["from_email"] = {"sender_email": { "$eq": from_email}}
         
         if folder:
             query_filter["folder"] = {"folder": {"$eq": folder}}

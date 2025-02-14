@@ -7,8 +7,11 @@ from ..models.errors import UnsupportedMessageTypeError, NotFoundError, Unauthor
 from logging_handler import use_logginghandler
 from tools.optimal_embeddings_model.data_types.email import Email, MessageType
 from tools.optimal_embeddings_model.mailio_ai_libs.collect_emails import extract_message_type, extract_html, extract_text, extract_subject, extract_sender, extract_folder, extract_message_id, extract_created, message_to_sentences
+import threading
+import traceback
+import urllib.parse
 
-# logger = use_logginghandler()
+logger = use_logginghandler()
 
 class CouchDBService:
     """
@@ -16,6 +19,7 @@ class CouchDBService:
     The closest I could find for docs: https://ibm.github.io/cloudant-python-sdk/docs/0.7.0/apidocs/ibmcloudant/ibmcloudant.cloudant_v1.html
     DetailedResponse object: https://github.com/IBM/python-sdk-core/blob/db16465c0451828c431bf5e22b1c59e63285bcf4/ibm_cloud_sdk_core/detailed_response.py#L23
     """
+    
     def __init__(self, cfg: dict):
         """
         Initialize the CouchDB service
@@ -62,7 +66,8 @@ class CouchDBService:
 
         # skip encrypted emails, list only SMTP emails
         if msg_type is None or msg_type != "application/mailio-smtp+json":
-            raise UnsupportedMessageTypeError("Unsupported message type: " + str(msg_type))
+            return None
+            # raise UnsupportedMessageTypeError("Unsupported message type: " + str(msg_type))
 
         message = extract_html(doc)
         message_type = MessageType.HTML
@@ -93,6 +98,36 @@ class CouchDBService:
             str: The database name
         """
         return "userdb-" + binascii.hexlify(address.encode()).decode()
+
+    def get_raw_message_by_id(self, _id:str, address:str) -> Dict:
+        """
+        Get a raw message by its ID
+        Args:
+            _id: str: The ID of the message to get
+            address: str: The address of the user
+        Returns:
+            dict: The message
+        """
+        if not _id or not address:
+            raise ValueError("Invalid message ID or address")
+        
+        try:
+            db_name = self.address_to_db_name(address)
+            escaped_id = _id.replace("+", " ") # i don't know what exactly couchdb does with the id, but it's better to escape it
+            message = self.client.get_document(db_name, escaped_id).get_result()
+            return message
+        except ApiException as e:
+            if e.status_code == 404:
+                raise NotFoundError
+            if e.status_code == 401 or e.status_code == 403:
+                raise UnauthorizedError
+                
+            raise InvalidUsageError
+        except Exception as e:
+            # print stack trace
+            logger.error(f"Error getting message by ID: {_id}, address: {address}, error: {e}")    
+            traceback.print_exc()
+            raise e
     
     def get_message_by_id(self, _id:str, address:str) -> Email:
         """
@@ -107,9 +142,11 @@ class CouchDBService:
         
         try:
             db_name = self.address_to_db_name(address)
-            message = self.client.get_document(db_name, _id).get_result()
+            escaped_id = _id.replace("+", " ") # i don't know what exactly couchdb does with the id, but it's better to escape it
+            message = self.client.get_document(db_name, escaped_id).get_result()
             email = self.message_to_email(message)
-            return email
+            # returns original message and email from database
+            return message, email
         except ApiException as e:
             if e.status_code == 404:
                 raise NotFoundError
@@ -117,6 +154,31 @@ class CouchDBService:
                 raise UnauthorizedError
                 
             raise InvalidUsageError
+        except Exception as e:
+            # print stack trace
+            logger.error(f"Error getting message by ID: {_id}, address: {address}, error: {e}")    
+            traceback.print_exc()
+            raise e
+
+    def put_message(self, message:Dict, address:str) -> Dict:
+        """
+        Put a document into the database
+        Args:
+            message: dict: The message to put
+        Returns:
+            dict: The response from the database
+        """
+        if not message or not address:
+            raise ValueError("Invalid message or address")
+        
+        try:
+            db_name = self.address_to_db_name(address)
+            response = self.client.put_document(db=db_name, doc_id=message.get("_id"), document=message).get_result()
+            return response
+        except ApiException as e:
+            if e.status_code == 401 or e.status_code == 403:
+                raise UnauthorizedError
+            raise e
 
     def get_bulk_by_id(self, address:str, ids:List[str]) -> List[Email]:
         """
@@ -134,7 +196,8 @@ class CouchDBService:
         for _id in ids:
             if not _id:
                 continue
-            doc = BulkGetQueryDocument(id=_id)
+            escaped_id = _id.replace("+", " ") # i don't know what exactly couchdb does but i know it doesn't like + in there
+            doc = BulkGetQueryDocument(id=escaped_id)
             doc_ids.append(doc)
         
         try:

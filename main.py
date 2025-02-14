@@ -12,10 +12,10 @@ from enum import Enum
 from api.services.couchdb_service import CouchDBService
 from api.services.embedding_service import EmbeddingService
 from api.services.pinecone_service import PineconeService
-from api.services.embedding_task_queue import EmbeddingTaskQueue, start_embedding_worker
-# from api.routes.extend_token_middleware import AutoExtendTokenMiddleware
+from api.services.embedding_task_queue import EmbeddingTaskQueue, create_embedding
 import os
 import multiprocessing
+import threading
 
 
 # config
@@ -55,17 +55,8 @@ cfg = get_config()
 app.state.config = cfg
 app.state.couchdb_service = CouchDBService(cfg)
 app.state.embedding_service = EmbeddingService(cfg)
-app.state.pinecone_service = PineconeService.get_instance(cfg, dimension=app.state.embedding_service.model.config.hidden_size)
+app.state.pinecone_service = PineconeService(cfg, dimension=app.state.embedding_service.model.config.hidden_size)
 app.state.embedding_task_queue = EmbeddingTaskQueue(cfg)
-
-# app.add_middleware(AutoExtendTokenMiddleware)
-
-# start embedding worker
-queues = [app.state.embedding_task_queue.queue.name]
-redis_conn = app.state.embedding_task_queue.redis_conn
-
-for i in range(min(multiprocessing.cpu_count(), 2)): # max 2 workers
-    multiprocessing.Process(target=start_embedding_worker, args=(queues,cfg, )).start()
 
 app.include_router(main_router)
 
@@ -101,6 +92,25 @@ async def unified_exception_handler(request: Request, exc: HTTPException):
         content={"error": exc.detail},
     )
 
+
+# start queue workers in separate multiprocessing process
+# be careful with this, as it will start a new process for each worker 
+# (new model will be reloaded as many times as there are workers)
+num_workers = 2  # Number of worker processes
+processes = []
+
+for i in range(num_workers):
+    p = multiprocessing.Process(target=create_embedding, args=(cfg,))
+    processes.append(p)
+    p.start()
+
+@app.on_event('shutdown')
+def on_shutdown():
+    print('Server shutting down...')
+    for p in processes:
+        p.terminate()
+        p.join()
+
 # if __name__ == '__main__':
-#     # run the embedding workers
+    
 #     uvicorn.run("main:app", host="0.0.0.0", port=8888, log_level="info", reload=True)
