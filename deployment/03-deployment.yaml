@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailio-ai
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailio-ai
+  template:
+    metadata:
+      labels:
+        app: mailio-ai
+    spec:
+      containers:
+        - name: mailio-ai
+          image: mailio/mailio-ai:latest  # Replace with actual image
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /api/healthcheck
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /api/healthcheck
+              port: 8000
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "60"]
+          volumeMounts:
+            - name: config-volume
+              mountPath: "/app/config.yaml"  # Mount as a file
+              subPath: "config.yaml"  # Extract only this file
+          env: 
+            - name: CONFIG_FILE
+              value: "/app/config.yaml"  # Reference path for config file
+            - name: JWT_SECRET_KEY
+              valueFrom: 
+                secretKeyRef:
+                  name: mailio-ai-secrets
+                  key: jwt_secret_key
+            - name: SYSTEM_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mailio-ai-secrets
+                  key: system_username
+            - name: SYSTEM_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mailio-ai-secrets
+                  key: system_password
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mailio-ai-secrets
+                  key: couchdb_password
+            - name: PINECONE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mailio-ai-secrets
+                  key: pinecone_api_key
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mailio-ai-secrets
+                  key: redis_password
+      volumes:
+        - name: config-volume
+          configMap:
+            name: mailio-ai-config  # This matches the ConfigMap name
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailio-ai-service
+spec:
+  selector:
+    app: mailio-ai  # Must match the Deployment's label
+  ports:
+    - protocol: TCP
+      port: 80       # Port the service is exposed on
+      targetPort: 8000  # Port on the pod (your app's container)
+  type: ClusterIP

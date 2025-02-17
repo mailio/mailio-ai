@@ -96,7 +96,7 @@ async def unified_exception_handler(request: Request, exc: HTTPException):
 # start queue workers in separate multiprocessing process
 # be careful with this, as it will start a new process for each worker 
 # (new model will be reloaded as many times as there are workers)
-num_workers = 2  # Number of worker processes
+num_workers = 1  # Number of worker processes
 processes = []
 
 for i in range(num_workers):

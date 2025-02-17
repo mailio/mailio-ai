@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  app:
+    image: mailio/mailio-ai:latest  # Replace with your actual image
+    container_name: mailio-ai
+    env_file:
+      - .env
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro  # Mounts config.yaml as read-only
+    ports:
+      - "8000:8000"  # Adjust port mapping as needed
+    restart: unless-stopped

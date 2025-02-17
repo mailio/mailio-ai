@@ -29,6 +29,7 @@ from tools.optimal_embeddings_model.data_types.email import Email, MessageType, 
 
 nltk.download('punkt')
 nltk.download('punkt_tab')
+nltk.data.path.append('/tmp/nltk_data')
 
 
 # %% ../nbs/01_collect_emails.ipynb 4

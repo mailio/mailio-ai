@@ -10,6 +10,7 @@ from .dependencies import get_couchdb_service, get_embedding_service, get_pineco
 from fastapi import Query, Security
 from api.routes.extend_token_middleware import verify_and_extend_token
 from api.models.system_user import SystemUser
+from ..models.errors import UnsupportedMessageTypeError, NotFoundError, UnauthorizedError
 
 from typing import List
 
@@ -85,6 +86,10 @@ async def upsert_embedding(
         # if upsert successfull 
         message["search"] = True
         couchdb_service.put_message(message, body.address)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -110,55 +115,66 @@ async def query_embedding(
     """
     Query embeddings
     """
-    vector = embedding_service.embedder.embed([query])
+    try:
+        vector = embedding_service.embedder.embed([query])
 
-    # query embedding
-    response = pinecone_service.query(
-        address=address, 
-        query_embedding=vector[0].tolist(), 
-        top_k=top_k, 
-        folder=folder, 
-        beforeTimestamp=beforeTimestamp, 
-        afterTimestamp=afterTimestamp, 
-        from_email=from_email
-    )
-    matches = response.matches or []
-    output_matches:List[EmbeddingMatch] = []
-    all_ids = [match.id for match in matches]
-    
-    # retrieve all document by id from the couch database (for display purposes)
-    emails = couchdb_service.get_bulk_by_id(address, all_ids)
-    email_dict = {email.message_id: email for email in emails if email is not None}
+        # query embedding
+        response = pinecone_service.query(
+            address=address, 
+            query_embedding=vector[0].tolist(), 
+            top_k=top_k, 
+            folder=folder, 
+            beforeTimestamp=beforeTimestamp, 
+            afterTimestamp=afterTimestamp, 
+            from_email=from_email
+        )
+        matches = response.matches or []
+        output_matches:List[EmbeddingMatch] = []
+        all_ids = [match.id for match in matches]
+        
+        # retrieve all document by id from the couch database (for display purposes)
+        emails = couchdb_service.get_bulk_by_id(address, all_ids)
+        email_dict = {email.message_id: email for email in emails if email is not None}
 
-    for match in matches:
-        match_id = match.id.replace("+", " ") # i don't know what exactly couchdb does but i know it doesn't like + in there
-        metadata = match.metadata or {}
-        # check if match_id is in the email_dict
-        subject = None
-        if match_id not in email_dict:
-            subject = metadata.get("subject", None)
-        else:
-            subject = email_dict[match_id].subject
+        for match in matches:
+            match_id = match.id.replace("+", " ") # i don't know what exactly couchdb does but i know it doesn't like + in there
+            metadata = match.metadata or {}
+            # check if match_id is in the email_dict
+            subject = None
+            if match_id not in email_dict:
+                subject = metadata.get("subject", None)
+            else:
+                subject = email_dict[match_id].subject
 
-        output_matches.append(EmbeddingMatch(
-            message_id=match.id,
-            score=match.score,
-            created=metadata.get("created", None),
-            metadata=EmbeddingMetadata(
-                subject=subject,
-                folder=metadata.get("folder", None),
-                from_email=metadata.get("from_email", None),
-                from_name=metadata.get("from_name", None),
-            )
-        ))
+            output_matches.append(EmbeddingMatch(
+                message_id=match.id,
+                score=match.score,
+                created=metadata.get("created", None),
+                metadata=EmbeddingMetadata(
+                    subject=subject,
+                    folder=metadata.get("folder", None),
+                    from_email=metadata.get("from_email", None),
+                    from_name=metadata.get("from_name", None),
+                )
+            ))
 
-    resp:EmbeddingResponse = EmbeddingResponse(
-        address=address,
-        matches=output_matches,
-        model=embedding_service.embedding_model
-    )
-    
-    return resp
+        resp:EmbeddingResponse = EmbeddingResponse(
+            address=address,
+            matches=output_matches,
+            model=embedding_service.embedding_model
+        )
+        
+        return resp
+    except NotFoundError as e:
+        resp:EmbeddingResponse = EmbeddingResponse(
+            address=address,
+            matches=[],
+            model=embedding_service.embedding_model
+        )
+        return resp
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.delete("/api/v1/embedding", response_model=EmbeddingResponse)
 async def delete_message_by_id(

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mailio-ai-config
+data:
+  config.yaml: |
+    apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mailio-ai-config
+data:
+  config.yaml: |
+    version: 0.0.1
+
+    cors_origins: 
+      - https://*.mail.io
+
+    jwt:
+      expiration: 2592000 # seconds (24*60*60*30)
+      algorithm: HS256
+      sliding_expiration_threshold: 300 # seconds (5 minutes)
+
+    embedding_model: intfloat/e5-small-v2
+
+    couchdb:
+      host: http://localhost:5984
+      username: admin
+
+    pinecone:
+      index_name: https://myindex-....pinecone.io
+      cloud: aws
+      region: us-east-1
+      metric: cosine
+
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      username: default
+      db: 3

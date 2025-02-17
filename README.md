@@ -25,7 +25,9 @@ pip install -r requirements.txt
 
 ## Configuration
 
-Mailio AI uses a configuration file `config.yaml` to manage settings. Below is an example of the configuration file:
+Mailio AI uses a configuration file `config.yaml` to manage settings and `.env` to manage secrets (passwords, api keys, ...). 
+
+Below is an example of the configuration file:
 
 ```yaml
 version: 0.0.1
@@ -38,21 +40,11 @@ jwt:
   expiration: 2592000 # seconds (24*60*60*30)
   algorithm: HS256
   sliding_expiration_threshold: 300 # seconds (5 minutes)
-  # the following user and pass are only for /doc swag testing purposes and
-  # if the token is not refreshed on time (as fallback). Can safely be removed from the app
-  system_username: abc
-  system_password: abcdef
 
 
 embedding_model: jinaai/jina-embeddings-v3
 
-couchdb:
-  host: http://localhost:5984
-  username: admin
-  password: YOURPASSWORD
-
 pinecone:
-  api_key: pcks_pinecodekey
   index_name: myindex-...
   cloud: aws
   region: us-east-1
@@ -62,8 +54,16 @@ redis:
   host: localhost
   port: 6379
   username: default
-  password: pass
   db: 3
+```
+
+`.env example`:
+```bash
+JWT_SECRET_KEY=...
+SYSTEM_USERNAME=...
+SYSTEM_PASSWORD=...
+PINECONE_API_KEY=...
+REDIS_PASSWORD=...
 ```
 
 Replace the values with your actual configuration details.

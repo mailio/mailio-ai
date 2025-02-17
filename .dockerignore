@@ -2,4 +2,25 @@
 .vscode
 deployment.yaml
 Dockerfile
+.git
 config.yaml
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.pyz
+*.pywz
+
+nbs
+README.md
+LICENSE
+.gitignore
+
+# Ignore everything in the tools folder
+tools/**
+
+# Except this files
+!tools/optimal_embeddings_model/mailio_ai_libs/
+!tools/optimal_embeddings_model/mailio_ai_libs/*
+!tools/optimal_embeddings_model/data_types/
+!tools/optimal_embeddings_model/data_types/*
