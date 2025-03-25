@@ -55,4 +55,7 @@ def get_config() -> Dict:
     cfg_pinecone = cfg.data.get("pinecone", None)
     if cfg_pinecone:
         cfg.data["pinecone"]["api_key"] = os.environ.get("PINECONE_API_KEY", default=None)
+    cfg_openai = cfg.data.get("openai", None)
+    if cfg_openai:
+        cfg.data["openai"]["api_key"] = os.environ.get("OPENAI_API_KEY", default=None)
     return cfg.data

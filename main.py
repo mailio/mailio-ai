@@ -13,6 +13,7 @@ from api.services.couchdb_service import CouchDBService
 from api.services.embedding_service import EmbeddingService
 from api.services.pinecone_service import PineconeService
 from api.services.embedding_task_queue import EmbeddingTaskQueue, create_embedding
+from api.services.llm_service import LLMService
 import os
 import multiprocessing
 import threading
@@ -57,6 +58,7 @@ app.state.couchdb_service = CouchDBService(cfg)
 app.state.embedding_service = EmbeddingService(cfg)
 app.state.pinecone_service = PineconeService(cfg, dimension=app.state.embedding_service.model.config.hidden_size)
 app.state.embedding_task_queue = EmbeddingTaskQueue(cfg)
+app.state.llm_service = LLMService(cfg)
 
 app.include_router(main_router)
 

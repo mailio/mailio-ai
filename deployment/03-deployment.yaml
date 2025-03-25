@@ -76,6 +76,11 @@ spec:
                 secretKeyRef:
                   name: mailio-ai-secrets
                   key: redis_password
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mailio-ai-secrets
+                  key: openai_api_key
       volumes:
         - name: config-volume
           configMap:

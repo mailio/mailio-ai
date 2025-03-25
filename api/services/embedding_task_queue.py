@@ -57,7 +57,11 @@ def init_redis(cfg: Dict):
         raise ValueError("Redis port is missing")
     if redis_db is None:
         raise ValueError("Redis db is missing")
-    redisConnection = Redis(host=redis_host, port=redis_port, db=redis_db, username=username, password=password, retry_on_timeout=True, socket_keepalive=True, socket_connect_timeout=15, decode_responses=True, ssl=True)
+
+    # check if the host is localhost or 127.0.0.1
+    use_ssl = not (redis_host == "localhost" or redis_host == "127.0.0.1")
+
+    redisConnection = Redis(host=redis_host, port=redis_port, db=redis_db, username=username, password=password, retry_on_timeout=True, socket_keepalive=True, socket_connect_timeout=15, decode_responses=True, ssl=use_ssl)
     if redisConnection.ping():
         logging.info(f"Connected to Redis at {redis_host}:{redis_port}/{redis_db}")
     else:

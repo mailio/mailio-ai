@@ -37,3 +37,6 @@ data:
       port: 6379
       username: default
       db: 3
+
+    openai:
+      model: gpt-4o-mini

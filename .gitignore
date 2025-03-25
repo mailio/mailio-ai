@@ -339,3 +339,6 @@ cython_debug/
 .vscode
 config.yaml
 deployment/private
+
+.cursor
+.cursorrules

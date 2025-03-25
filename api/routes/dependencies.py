@@ -3,6 +3,7 @@ from api.services.couchdb_service import CouchDBService
 from api.services.embedding_service import EmbeddingService
 from api.services.pinecone_service import PineconeService
 from api.services.embedding_task_queue import EmbeddingTaskQueue
+from api.services.llm_service import LLMService
 from fastapi.security import OAuth2PasswordBearer
 from typing_extensions import Annotated
 
@@ -18,6 +19,9 @@ def get_pinecone_service(request: Request) -> PineconeService:
 
 def get_embedding_task_queue(request: Request) -> EmbeddingTaskQueue:
     return request.app.state.embedding_task_queue
+
+def get_llm_service(request: Request) -> LLMService:
+    return request.app.state.llm_service
 
 reuseable_oauth = OAuth2PasswordBearer(
     tokenUrl="/api/token",

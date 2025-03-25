@@ -1,6 +1,6 @@
 
 from tools.optimal_embeddings_model.data_types.email import Email
-from ..models.embedding import EmbeddingMatch, EmbeddingMetadata, EmbeddingResponse, EmbeddingRequest, EmbeddingUpsertRequest
+from ..models.embedding import EmbeddingMatch, EmbeddingMetadata, EmbeddingResponse, EmbeddingRequest, EmbeddingUpsertRequest, DeleteRequest
 from fastapi import APIRouter, Depends, HTTPException
 from ..services.couchdb_service import CouchDBService
 from ..services.embedding_service import EmbeddingService
@@ -176,19 +176,19 @@ async def query_embedding(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/api/v1/embedding", response_model=EmbeddingResponse)
-async def delete_message_by_id(
-    body: EmbeddingRequest,
+@router.delete("/api/v1/embedding")
+async def delete_message_by_ids(
+    body: DeleteRequest,
     pinecone_service: PineconeService = Depends(get_pinecone_service),
     user: dict = Depends(verify_and_extend_token),
+    status_code: int = 204, # no content on success
 ):
     """
     Delete a message embedding by ID.
     """
     try:
-        pinecone_service.delete(body.message_id, body.address)
+        pinecone_service.delete_by_ids(body.message_ids, body.address)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    return JSONResponse(content={"message": "Embedding deleted successfully"})
 

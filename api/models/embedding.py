@@ -29,3 +29,7 @@ class EmbeddingUpsertRequest(BaseModel):
     message_id: str
     address: str
     metadata: EmbeddingMetadata
+
+class DeleteRequest(BaseModel):
+    message_ids: List[str]
+    address: str

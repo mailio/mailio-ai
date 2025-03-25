@@ -63,6 +63,7 @@ class PineconeService:
     def index_stats(self):
         stats = index.describe_index_stats()
         return stats
+        
 
     def upsert(self, address:str, embedding_id: str, vector: List[float], metadata: Dict):
         """
@@ -122,5 +123,11 @@ class PineconeService:
             message_id: str: The message ID to delete
         """
         self.index.delete(message_id, namespace=address)
+
+    def delete_by_ids(self, message_ids: List[str], address: str):
+        """
+        Delete the embeddings from the Pinecone index by message IDs
+        """
+        self.index.delete(ids=message_ids, namespace=address)
         
 
