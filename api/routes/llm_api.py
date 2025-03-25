@@ -4,6 +4,8 @@ from ..services.llm_service import LLMService
 from fastapi import Depends
 from .dependencies import get_llm_service
 import json
+from ..services.pinecone_service import PineconeService
+from .dependencies import get_pinecone_service
 
 router = APIRouter()
 
@@ -11,12 +13,12 @@ router = APIRouter()
 async def rerank(
     queryWithDocuments: LLMQueryWithDocuments,
     llm_service: LLMService = Depends(get_llm_service),
+    pinecone_service: PineconeService = Depends(get_pinecone_service),
 ):
     """
     Rerank a message using a LLM.
     """
-    reranked_results = llm_service.rerank(queryWithDocuments.query, queryWithDocuments.documents)
-    # reranked_results_json = json.loads(reranked_results)
+    reranked_results = pinecone_service.rerank(queryWithDocuments.query, queryWithDocuments.documents)
     return reranked_results
 
 @router.post("/api/v1/llm/insights")

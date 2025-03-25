@@ -4,6 +4,8 @@ from typing import Dict, List
 from pinecone.data.index import QueryResponse
 import threading
 from urllib.parse import urlparse
+import time
+from ..models.llm import LLMQueryWithDocuments, EmailDocument
 
 class PineconeService:
 
@@ -129,5 +131,37 @@ class PineconeService:
         Delete the embeddings from the Pinecone index by message IDs
         """
         self.index.delete(ids=message_ids, namespace=address)
-        
 
+    def rerank(self, query: str, documents: List[EmailDocument]):
+        """
+        Rerank the documents based on the query
+        """
+        start_time = time.time()
+        pinecone_docs = []
+        for document in documents:
+            pinecone_docs.append({
+                "id": document.id,
+                "text": document.text
+            })
+        result = self.pc.inference.rerank(
+            model="bge-reranker-v2-m3",
+            query=query,
+            documents=pinecone_docs,
+            top_n=len(documents),
+            parameters={
+                "truncate": "END"
+            },
+            return_documents=False
+        )
+        reranked_results = []
+        reranked = result.rerank_result
+        data = reranked.data
+        for item in data:
+            _id = documents[item.index].id
+            reranked_results.append({
+                "id": _id,
+                "score": item.score
+            })
+        end_time = time.time()
+        print(f"Reranking took {end_time - start_time} seconds")
+        return {"results": reranked_results}

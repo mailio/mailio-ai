@@ -19,9 +19,11 @@ class LLMService:
             Check the list of emails and extract insights from them.
             Make sensible decision whether to include numbers section as described below based on the query and the content of the emails:  
             Query: {query}
+            In case a query is a question, return the answer in the answer field describing the top email.
             Return the insights in JSON format. Example:
             {{
                 "query": "project updates",
+                "answer": "The project is on schedule and the team is working well.",
                 "results": [
                     {{
                         "id": "123",
@@ -54,18 +56,20 @@ class LLMService:
             }}
             
         """
-        self.cross_encoder_model_name = 'BAAI/bge-reranker-base'
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.cross_encoder_model_name, trust_remote_code=True)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = self.model.to(self.device)
-        self.model.eval()
-        print(f"Cross encoder model {self.cross_encoder_model_name} running on: {self.device}")
-        self.tokenizer = AutoTokenizer.from_pretrained(self.cross_encoder_model_name, trust_remote_code=True)
+        # self.cross_encoder_model_name = 'BAAI/bge-reranker-base'
+        # self.model = AutoModelForSequenceClassification.from_pretrained(self.cross_encoder_model_name, trust_remote_code=True)
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # self.model = self.model.to(self.device)
+        # self.model.eval()
+        # print(f"Cross encoder model {self.cross_encoder_model_name} running on: {self.device}")
+        # self.tokenizer = AutoTokenizer.from_pretrained(self.cross_encoder_model_name, trust_remote_code=True)
 
-
-    def rerank(self, query: LLMQueryWithDocuments, documents: List[EmailDocument]):
-
-        document_content = []
+    def rerank_selfhosted(self, query: LLMQueryWithDocuments, documents: List[EmailDocument]):
+        """
+        Rerank the documents based on the query using a self-hosted model (BGE Reranker)
+        Uncomment the code to use the self-hosted model
+        """
+        document_content = []  
         query_content = []
         for document in documents:
             document_content.append(document.text)
@@ -102,7 +106,6 @@ class LLMService:
             for document in queryWithDocuments.documents
         ]
         prompt = self.insight_prompt.format(query=queryWithDocuments.query)
-        print(prompt)
 
         start_time = time.time()
 
