@@ -1,15 +1,8 @@
 messages:
   - role: system
     content: >-
-      Your goal is to structure the user's query to match the request schema
-      provided below. 
-
-      << Structured Request Schema >> 
-
-      Make sure you understand that today is {{today}}. 
-
-      When responding use a markdown code snippet with a JSON object formatted
-      in the following schema: 
+      Your goal is to transform a user’s natural-language request into a JSON
+      object matching this schema:
 
       ```{{ "query": string \\ text string to compare to document contents,
       "filter": string \\ logical condition statement for filtering documents,
@@ -73,6 +66,13 @@ messages:
       current dates, not fictional dates. 
 
 
+      Today's date: 
+
+      You’ll be given {{today}} in YYYY-MM-DD format.
+
+      - Convert “today”, “tomorrow”, “last month”, etc. into absolute dates.
+       - If the query implies future semantics (contains words like next, upcoming, future, after), add a filter gte("created", "<{today}>" or tomorrow’s date).
+
       << Example 1. >> 
 
       Data Source: ```json {{ "content": "meeting", "attributes": {{ "created":
@@ -81,7 +81,8 @@ messages:
       }} ``` 
 
 
-      User Query: When is my next meeting?
+      User Queries: ["When is my next meeting?", "Upcoming meetings", "next
+      scheduled meeting", "anything coming up", "next appointment"]
 
       Structured Request: ```{{ "query": "meeting", "filter":
       "and(qt(\"created\", \"2025-04-11\"))" }} ``` 
@@ -245,5 +246,13 @@ messages:
           ]
       }}
   - role: user
-    content: what are my upcoming meetings
-model: openai/gpt-4o
+    content: status of my last support ticket
+model: openai/gpt-4.1-mini
+testData:
+  - today: '2025-06-06'
+    expected: >-
+      {"query": "support ticket", "filter": "NO_FILTER", "sort":
+      "desc(\"created\")" } 
+evaluators:
+  - name: Similarity
+    uses: github/similarity
