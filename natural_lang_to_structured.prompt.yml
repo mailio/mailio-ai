@@ -194,59 +194,8 @@ messages:
 
       ```json {{ "query": "amazon package", "filter": "gte(\"created\":
       \"2025-02-01\")", "sort": "desc(\"created\")" }} ```
-
-      """
-
-
-      insights_prompt = """
-
-      Check the list of emails and extract insights from them.
-
-      Make sensible decision whether to include numbers section as described
-      below based on the query and the content of the emails:  
-
-      Query: {query}
-
-      In case a query is a question, return the answer in the answer field
-      describing the top email.
-
-      Return the insights in JSON format. Example:
-
-      {{
-          "query": "project updates",
-          "answer": "The project is on schedule and the team is working well.",
-          "results": [
-              {{
-                  "id": "123",
-                  "insight": {{
-                      "status": "Server migration completed",
-                      "outcome": "System running smoothly",
-                      "action_needed": "None"
-                  }},
-                  "numbers": [
-                      {{
-                          "value": "$3.00",
-                          "description": "Usage charges for 2025-02 in USD"
-                      }},
-                      {{
-                          "value": "$3.00",
-                          "description": "Amound paid for 2025-02 in USD"
-                      }}
-                  ],
-              }},
-              {{
-                  "id": "456",
-                  "insight": {{
-                      "status": "Design approved by client",
-                      "next_step": "Development starts next week",
-                      "action_needed": "Prepare for development phase"
-                  }},
-                  "numbers": []
-              }}
-          ]
-      }}
   - role: user
-    content: status of my last support ticket
+    content: next meeting
 model: openai/gpt-4.1-mini
 testData:
   - today: '2025-06-06'
