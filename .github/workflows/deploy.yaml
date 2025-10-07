@@ -59,28 +59,11 @@ jobs:
       - name: Store DO authentication token as a secret in cluster
         run: doctl registry kubernetes-manifest | kubectl apply -f -
 
-      - name: Update configmap
-        if: endsWith(github.ref, '/test')
-        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/private/01-configmap.yaml
-    
-      - name: Update configmap
-        if: endsWith(github.ref, '/production')
-        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/private/production/01-configmap.yaml
-
-
-      - name: Update secrets
-        if: endsWith(github.ref, '/test')
-        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/private/02-secrets.yaml
-
-      - name: Update secrets
-        if: endsWith(github.ref, '/production')
-        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/private/production/02-secrets.yaml
-
       - name: Deploy to DigitalOcean Kubernetes
-        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/private/03-deployment.yaml
+        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/03-deployment.yaml
 
       - name: Update pod disruption budget
-        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/private/04-poddisruptionbudget.yaml
+        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/04-poddisruptionbudget.yaml
 
       - name: Verify deployment
         run: kubectl get ds

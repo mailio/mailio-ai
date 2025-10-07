@@ -3,11 +3,6 @@ kind: Deployment
 metadata:
   name: mailio-ai
 spec:
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
   replicas: 1
   selector:
     matchLabels:
@@ -20,6 +15,7 @@ spec:
       containers:
         - name: mailio-ai
           image: mailio/mailio-ai:latest  # Replace with actual image
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           readinessProbe:
@@ -97,4 +93,4 @@ spec:
     - protocol: TCP
       port: 80       # Port the service is exposed on
       targetPort: 8000  # Port on the pod (your app's container)
-  type: ClusterIP
+  type: ClusterIP            
