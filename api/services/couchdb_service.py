@@ -3,7 +3,7 @@ from ibm_cloud_sdk_core.authenticators import BasicAuthenticator
 from ibm_cloud_sdk_core.api_exception import ApiException
 from typing import Dict, List
 import binascii
-from ..models.errors import UnsupportedMessageTypeError, NotFoundError, UnauthorizedError
+from ..models.errors import NotFoundError, UnauthorizedError, InvalidUsageError
 from logging_handler import use_logginghandler
 from tools.optimal_embeddings_model.data_types.email import Email, MessageType
 from tools.optimal_embeddings_model.mailio_ai_libs.collect_emails import extract_message_type, extract_html, extract_text, extract_subject, extract_sender, extract_folder, extract_message_id, extract_created, message_to_sentences
@@ -118,11 +118,11 @@ class CouchDBService:
             return message
         except ApiException as e:
             if e.status_code == 404:
-                raise NotFoundError
+                raise NotFoundError(address)
             if e.status_code == 401 or e.status_code == 403:
-                raise UnauthorizedError
+                raise UnauthorizedError()
                 
-            raise InvalidUsageError
+            raise InvalidUsageError()
         except Exception as e:
             # print stack trace
             logger.error(f"Error getting message by ID: {_id}, address: {address}, error: {e}")    
@@ -149,11 +149,11 @@ class CouchDBService:
             return message, email
         except ApiException as e:
             if e.status_code == 404:
-                raise NotFoundError
+                raise NotFoundError(address)
             if e.status_code == 401 or e.status_code == 403:
-                raise UnauthorizedError
+                raise UnauthorizedError()
                 
-            raise InvalidUsageError
+            raise InvalidUsageError()
         except Exception as e:
             # print stack trace
             logger.error(f"Error getting message by ID: {_id}, address: {address}, error: {e}")    
@@ -177,7 +177,7 @@ class CouchDBService:
             return response
         except ApiException as e:
             if e.status_code == 401 or e.status_code == 403:
-                raise UnauthorizedError
+                raise UnauthorizedError()
             raise e
 
     def get_bulk_by_id(self, address:str, ids:List[str]) -> List[Email]:
@@ -213,9 +213,9 @@ class CouchDBService:
                 messages.append(email)
         except ApiException as e:
             if e.status_code == 404:
-                raise NotFoundError
+                raise NotFoundError(address)
             if e.status_code == 401 or e.status_code == 403:
-                raise UnauthorizedError
+                raise UnauthorizedError()
             raise e
 
         return messages
