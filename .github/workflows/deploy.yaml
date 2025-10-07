@@ -44,7 +44,7 @@ jobs:
         run: docker push registry.digitalocean.com/mailio/mailio-ai:${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7)
 
       - name: Update deployment file
-        run: TAG=${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7) && sed -i 's|<IMAGE>|registry.digitalocean.com/mailio/mailio-ai:'${TAG}'|' $GITHUB_WORKSPACE/deployment/private/03-deployment.yaml
+        run: TAG=${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7) && sed -i 's|<IMAGE>|registry.digitalocean.com/mailio/mailio-ai:'${TAG}'|' $GITHUB_WORKSPACE/deployment/03-deployment.yaml
 
       - name: Save DigitalOcean kubeconfig (production)
         if: endsWith(github.ref, '/production')

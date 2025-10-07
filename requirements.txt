@@ -4,11 +4,11 @@ python-multipart==0.0.20
 uvicorn==0.34.0
 pydantic==2.10.6
 requests==2.32.3
-pinecone-client[grpc]==5.0.1
+pinecone[grpc]==7.3.0
 ibmcloudant>=0.10.0
 nltk==3.9.1
 transformers==4.48.1
-torch>=2.6.0+cpu
+torch>=2.8.0+cpu
 dacite==1.8.1
 beautifulsoup4==4.12.3
 sentence-transformers==3.4.0
