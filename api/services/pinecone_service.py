@@ -1,8 +1,7 @@
 from pinecone.grpc import PineconeGRPC as Pinecone
 from pinecone import ServerlessSpec
 from typing import Dict, List
-from pinecone.data.index import QueryResponse
-import threading
+from pinecone.db_data.models import QueryResponse
 from urllib.parse import urlparse
 import time
 from ..models.llm import LLMQueryWithDocuments, EmailDocument
