@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: mailio-ai
-          image: mailio/mailio-ai:latest  # Replace with actual image
+          image: <IMAGE>  # Replace with actual image
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
