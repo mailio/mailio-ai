@@ -4,65 +4,17 @@ from openai import OpenAI
 from typing import List
 import json
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from api.services.llm_service_prompt import selfquery_prompt, insights_prompt
 import torch
 import time
 import os
-
+from datetime import datetime
 class LLMService:
     def __init__(self, cfg: Dict):
         self.cfg = cfg
         self.openai = OpenAI(api_key=cfg["openai"]["api_key"])
         self.model_name = cfg["openai"]["model"]
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
-
-        self.insight_prompt = """
-            Check the list of emails and extract insights from them.
-            Make sensible decision whether to include numbers section as described below based on the query and the content of the emails:  
-            Query: {query}
-            In case a query is a question, return the answer in the answer field describing the top email.
-            Return the insights in JSON format. Example:
-            {{
-                "query": "project updates",
-                "answer": "The project is on schedule and the team is working well.",
-                "results": [
-                    {{
-                        "id": "123",
-                        "insight": {{
-                            "status": "Server migration completed",
-                            "outcome": "System running smoothly",
-                            "action_needed": "None"
-                        }},
-                        "numbers": [
-                            {{
-                                "value": "$3.00",
-                                "description": "Usage charges for 2025-02 in USD"
-                            }},
-                            {{
-                                "value": "$3.00",
-                                "description": "Amound paid for 2025-02 in USD"
-                            }}
-                        ],
-                    }},
-                    {{
-                        "id": "456",
-                        "insight": {{
-                            "status": "Design approved by client",
-                            "next_step": "Development starts next week",
-                            "action_needed": "Prepare for development phase"
-                        }},
-                        "numbers": []
-                    }}
-                ]
-            }}
-            
-        """
-        # self.cross_encoder_model_name = 'BAAI/bge-reranker-base'
-        # self.model = AutoModelForSequenceClassification.from_pretrained(self.cross_encoder_model_name, trust_remote_code=True)
-        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # self.model = self.model.to(self.device)
-        # self.model.eval()
-        # print(f"Cross encoder model {self.cross_encoder_model_name} running on: {self.device}")
-        # self.tokenizer = AutoTokenizer.from_pretrained(self.cross_encoder_model_name, trust_remote_code=True)
 
     def rerank_selfhosted(self, query: LLMQueryWithDocuments, documents: List[EmailDocument]):
         """
@@ -105,7 +57,7 @@ class LLMService:
             }
             for document in queryWithDocuments.documents
         ]
-        prompt = self.insight_prompt.format(query=queryWithDocuments.query)
+        prompt = insights_prompt.format(query=queryWithDocuments.query)
 
         start_time = time.time()
 
@@ -121,4 +73,14 @@ class LLMService:
         end_time = time.time()
         print(f"Time taken to execute the insights extraction: {end_time - start_time} seconds")
 
+        return response.choices[0].message.content
+
+    def selfquery(self, query: str):
+        today = datetime.now().strftime("%Y-%m-%d")
+        formatted_prompt = selfquery_prompt.format(today=today)
+        response = self.openai.chat.completions.create(
+            model=self.model_name,
+            messages=[{"role": "system", "content": formatted_prompt}, {"role": "user", "content": query}],
+            response_format={"type": "json_object"}
+        )
         return response.choices[0].message.content

@@ -6,13 +6,20 @@ from ..services.couchdb_service import CouchDBService
 from ..services.embedding_service import EmbeddingService
 from ..services.pinecone_service import PineconeService
 from ..services.embedding_task_queue import EmbeddingTaskQueue
-from .dependencies import get_couchdb_service, get_embedding_service, get_pinecone_service, get_embedding_task_queue
+from ..services.llm_service import LLMService
+from .dependencies import get_couchdb_service, get_embedding_service, get_pinecone_service, get_embedding_task_queue, get_llm_service
 from fastapi import Query, Security
 from api.routes.extend_token_middleware import verify_and_extend_token
 from api.models.system_user import SystemUser
 from ..models.errors import UnsupportedMessageTypeError, NotFoundError, UnauthorizedError
-
+from queue import Queue
+import threading
+from loguru import logger
+import json
 from typing import List
+import traceback
+from api.utils.query_composer import QueryComposer
+from kneed import KneeLocator
 
 router = APIRouter()
 
@@ -63,7 +70,7 @@ async def upsert_embedding(
         if not all(isinstance(x, float) for x in request_vector):
             raise ValueError("Invalid vector type")
         
-        metadata = body.metadata.dict()
+        metadata = body.metadata.model_dump()
         del metadata["vector"]
 
         # remove None values from metadata
@@ -72,7 +79,7 @@ async def upsert_embedding(
         # get the email from the database
         message = couchdb_service.get_raw_message_by_id(body.message_id, body.address)
         if message is None:
-            raise ValueError(f"Email not found for message_id: {message_id}, address: {address}")
+            raise ValueError(f"Email not found for message_id: {body.message_id}, address: {body.address}")
 
         # preventing multiple inserts, skip adding to index if already exists
         if message.get("search", False):
@@ -87,10 +94,14 @@ async def upsert_embedding(
         message["search"] = True
         couchdb_service.put_message(message, body.address)
     except ValueError as e:
+        logger.debug(f"ValueError: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except NotFoundError as e:
+        logger.debug(f"NotFoundError: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
+        logger.debug(f"Exception: {e}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
     return EmbeddingResponse(
@@ -110,19 +121,40 @@ async def query_embedding(
     pinecone_service: PineconeService = Depends(get_pinecone_service),
     embedding_service: EmbeddingService = Depends(get_embedding_service),
     couchdb_service: CouchDBService = Depends(get_couchdb_service),
+    llm_service: LLMService = Depends(get_llm_service),
     user: SystemUser = Security(verify_and_extend_token),
 ):
     """
     Query embeddings
     """
     try:
-        vector = embedding_service.embedder.embed([query])
+        short_query = query
+        try:
+            result = llm_service.selfquery(query)
+            result_json = json.loads(result)
+            logger.debug(f"LLM result JSON: {result_json}")
+            short_query = result_json.get("query", query)
+            if short_query == "":
+                short_query = query
 
+            query_composer = QueryComposer()
+            pinecone_filter = query_composer.compose(result_json)
+            beforeTimestamp = pinecone_filter.timestampBefore
+            afterTimestamp = pinecone_filter.timestampAfter
+            from_email = pinecone_filter.fromEmail
+
+        except Exception as e:
+            logger.debug(f"Exception: {e}")
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+            logger.debug(f"LLM result JSON: {result_json}")
+
+        vector = embedding_service.embedder.embed([short_query])
+        
         # query embedding
         response = pinecone_service.query(
             address=address, 
             query_embedding=vector[0].tolist(), 
-            top_k=top_k, 
+            top_k=top_k * 5, # 5 times more results than requested (to account for filtering and sorting)
             folder=folder, 
             beforeTimestamp=beforeTimestamp, 
             afterTimestamp=afterTimestamp, 
@@ -130,6 +162,20 @@ async def query_embedding(
         )
         matches = response.matches or []
         output_matches:List[EmbeddingMatch] = []
+
+        # knee-point detection
+        knee = len(matches)
+        if len(matches) > 3:
+            kl = KneeLocator(
+                range(len(matches)),
+                [match.score for match in matches],
+                curve="convex",
+                direction="decreasing"
+            )
+            knee = kl.knee
+            
+        logger.debug(f"suggested knee point: {knee}")
+
         all_ids = [match.id for match in matches]
         
         # retrieve all document by id from the couch database (for display purposes)
@@ -158,14 +204,18 @@ async def query_embedding(
                 )
             ))
 
+        # clip results to top_k
+        output_matches = output_matches[:top_k]
+
         resp:EmbeddingResponse = EmbeddingResponse(
             address=address,
             matches=output_matches,
-            model=embedding_service.embedding_model
+            model=embedding_service.embedding_model,
+            knee=knee
         )
-        
         return resp
     except NotFoundError as e:
+        logger.debug(f"Not found error: {e}")
         resp:EmbeddingResponse = EmbeddingResponse(
             address=address,
             matches=[],
@@ -173,6 +223,8 @@ async def query_embedding(
         )
         return resp
     except Exception as e:
+        logger.debug(f"Exception: {e}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -189,6 +241,8 @@ async def delete_message_by_ids(
     try:
         pinecone_service.delete_by_ids(body.message_ids, body.address)
     except Exception as e:
+        logger.debug(f"Exception: {e}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

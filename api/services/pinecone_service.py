@@ -6,6 +6,7 @@ import threading
 from urllib.parse import urlparse
 import time
 from ..models.llm import LLMQueryWithDocuments, EmailDocument
+from loguru import logger
 
 class PineconeService:
 
@@ -94,25 +95,26 @@ class PineconeService:
             dict: The query results
         """
         query_filter = {}
+        query_filter["$and"] = []
         if afterTimestamp and beforeTimestamp:
-            query_filter["created"] = {"$and": [ 
-                { "created" : {"$gte": afterTimestamp}},
-                { "created" : {"$lte": beforeTimestamp}}
-            ]}
+            query_filter["$and"].append({"created": {"$gte": afterTimestamp, "$lte": beforeTimestamp}})
+
         if afterTimestamp and not beforeTimestamp:
-            query_filter["created"] = {"$lte": beforeTimestamp}
+            query_filter["$and"].append({"created": {"$gte": afterTimestamp}})
         
         if beforeTimestamp and not afterTimestamp:
-            query_filter["created"] = {"$gte": afterTimestamp}
+            query_filter["$and"].append({"created": {"$lte": beforeTimestamp}})
         
         if from_email:
-            query_filter["from_email"] = {"sender_email": { "$eq": from_email}}
+            query_filter["$and"].append({"from_email": {"$in": [from_email]}})
         
         if folder:
-            query_filter["folder"] = {"folder": {"$eq": folder}}
+            query_filter["$and"].append({"folder": {"$eq": folder}})
 
-        if len(query_filter) == 0:
+        if len(query_filter["$and"]) == 0:
             query_filter = None
+
+        logger.debug(f"query_filter: {query_filter}")
 
         results = self.index.query(vector=query_embedding, filter=query_filter, top_k=top_k, namespace=address, include_metadata=True)
 

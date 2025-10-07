@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import uvicorn
+from contextlib import asynccontextmanager
 
 from logging_handler import use_logginghandler
 import datetime
@@ -16,7 +17,6 @@ from api.services.embedding_task_queue import EmbeddingTaskQueue, create_embeddi
 from api.services.llm_service import LLMService
 import os
 import multiprocessing
-import threading
 
 
 # config
@@ -94,24 +94,29 @@ async def unified_exception_handler(request: Request, exc: HTTPException):
         content={"error": exc.detail},
     )
 
-
 # start queue workers in separate multiprocessing process
 # be careful with this, as it will start a new process for each worker 
 # (new model will be reloaded as many times as there are workers)
 num_workers = 1  # Number of worker processes
 processes = []
 
-for i in range(num_workers):
-    p = multiprocessing.Process(target=create_embedding, args=(cfg,))
-    processes.append(p)
-    p.start()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # on server start
+    for i in range(num_workers):
+        p = multiprocessing.Process(target=create_embedding, args=(cfg,))
+        processes.append(p)
+        p.start()
+    print(f'Queue workers started with {num_workers} processes')
 
-@app.on_event('shutdown')
-def on_shutdown():
+    yield
+    # on server shutdown
     print('Server shutting down...')
     for p in processes:
         p.terminate()
         p.join()
+
+
 
 # if __name__ == '__main__':
     

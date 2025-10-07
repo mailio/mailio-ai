@@ -18,6 +18,8 @@ async def rerank(
     """
     Rerank a message using a LLM.
     """
+    if len(queryWithDocuments.documents) == 0:
+        return { "results": [] }
     reranked_results = pinecone_service.rerank(queryWithDocuments.query, queryWithDocuments.documents)
     return reranked_results
 
@@ -29,6 +31,8 @@ async def insights(
     """
     Extract insights from a message using a LLM.
     """
+    if len(queryWithDocuments.documents) == 0:
+        return { "query": queryWithDocuments.query, "results": [], "answer": "No results found" }
     insights = llm_service.extract_insights(queryWithDocuments)
     insights_json = json.loads(insights)
     return insights_json

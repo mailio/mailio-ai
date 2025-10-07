@@ -19,6 +19,7 @@ class EmbeddingResponse(BaseModel):
     address: str
     matches: Optional[List[EmbeddingMatch]] = None
     model: Optional[str] = None
+    knee: Optional[int] = None # knee-point detection (suggested number of matches)
 
 class EmbeddingRequest(BaseModel):
     message_id: str
