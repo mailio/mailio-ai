@@ -27,6 +27,15 @@ sys.path.append(project_root)
 
 from tools.optimal_embeddings_model.data_types.email import Email, MessageType, json_encoder
 
+# nltk download is not working with ssl verification
+import ssl
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
 nltk.download('punkt')
 nltk.download('punkt_tab')
 nltk.data.path.append('/tmp/nltk_data')
