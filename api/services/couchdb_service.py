@@ -1,7 +1,7 @@
 from ibmcloudant.cloudant_v1 import CloudantV1, BulkGetQueryDocument
 from ibm_cloud_sdk_core.authenticators import BasicAuthenticator
 from ibm_cloud_sdk_core.api_exception import ApiException
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import binascii
 from ..models.errors import NotFoundError, UnauthorizedError, InvalidUsageError
 from logging_handler import use_logginghandler
@@ -66,7 +66,10 @@ class CouchDBService:
 
         # skip encrypted emails, list only SMTP emails
         if msg_type is None or msg_type != "application/mailio-smtp+json":
-            return None
+            folder = extract_folder(doc)
+            message_id = extract_message_id(doc)
+            created = extract_created(doc)
+            return Email(message_type=MessageType.TEXT, sentences=[], subject=None, sender_name=None, sender_email=None, message_id=message_id, folder=folder, created=created)
             # raise UnsupportedMessageTypeError("Unsupported message type: " + str(msg_type))
 
         message = extract_html(doc)
@@ -180,7 +183,7 @@ class CouchDBService:
                 raise UnauthorizedError()
             raise e
 
-    def get_bulk_by_id(self, address:str, ids:List[str]) -> List[Email]:
+    def get_bulk_by_id(self, address:str, ids:List[str]) -> Tuple[List[Email], List[str]]:
         """
         Get a list of messages by their IDs
         Args:
@@ -194,23 +197,26 @@ class CouchDBService:
         messages = []
         doc_ids = []
         for _id in ids:
-            if not _id:
-                continue
             escaped_id = _id.replace("+", " ") # i don't know what exactly couchdb does but i know it doesn't like + in there
             doc = BulkGetQueryDocument(id=escaped_id)
             doc_ids.append(doc)
         
+        missing: List[str] = []
         try:
             db_name = self.address_to_db_name(address)
-            bulk_get_results = self.client.post_bulk_get(db=db_name, docs=doc_ids).get_result()
-            for r in bulk_get_results["results"]:
-                if "error" in r:
-                    continue
-                message = r["docs"][0]
-                if "ok" in message:
-                    message = message["ok"]
-                email = self.message_to_email(message)
-                messages.append(email)
+            bulk_get_results = self.client.post_bulk_get(db=db_name, docs=doc_ids, latest=True, revs=False).get_result()
+            for result in bulk_get_results.get("results", []):
+                got_ok = False
+                for entry in result.get("docs", []):
+                    ok_doc = entry.get("ok")
+                    if ok_doc and not ok_doc.get("_deleted", False):
+                        email = self.message_to_email(ok_doc)
+                        if email is not None:
+                            messages.append(email)
+                            got_ok = True
+                            break
+                if not got_ok:
+                    missing.append(result.get("id"))
         except ApiException as e:
             if e.status_code == 404:
                 raise NotFoundError(address)
@@ -218,5 +224,5 @@ class CouchDBService:
                 raise UnauthorizedError()
             raise e
 
-        return messages
+        return messages, missing
 

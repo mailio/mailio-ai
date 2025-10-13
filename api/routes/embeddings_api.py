@@ -14,6 +14,7 @@ from api.models.system_user import SystemUser
 from ..models.errors import UnsupportedMessageTypeError, NotFoundError, UnauthorizedError
 from queue import Queue
 import threading
+import asyncio
 from loguru import logger
 import json
 from typing import List
@@ -179,7 +180,12 @@ async def query_embedding(
         all_ids = [match.id for match in matches]
         
         # retrieve all document by id from the couch database (for display purposes)
-        emails = couchdb_service.get_bulk_by_id(address, all_ids)
+        emails, missing_ids = couchdb_service.get_bulk_by_id(address, all_ids)
+        if missing_ids:
+            logger.debug(f"missing ids in database: {missing_ids}") 
+            asyncio.create_task(pinecone_service.delete_by_ids_async(missing_ids, address))
+            logger.debug(f"deleted {len(missing_ids)} messages from Pinecone")
+            
         email_dict = {email.message_id: email for email in emails if email is not None}
 
         for match in matches:
@@ -239,7 +245,9 @@ async def delete_message_by_ids(
     Delete a message embedding by ID.
     """
     try:
-        pinecone_service.delete_by_ids(body.message_ids, body.address)
+        # Delete from Pinecone asynchronously in background
+        if body.message_ids:
+            asyncio.create_task(pinecone_service.delete_by_ids_async(body.message_ids, body.address))
     except Exception as e:
         logger.debug(f"Exception: {e}")
         logger.debug(f"Traceback: {traceback.format_exc()}")

@@ -4,6 +4,8 @@ from typing import Dict, List
 from pinecone.db_data.models import QueryResponse
 from urllib.parse import urlparse
 import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from ..models.llm import LLMQueryWithDocuments, EmailDocument
 from loguru import logger
 
@@ -63,7 +65,7 @@ class PineconeService:
 
     
     def index_stats(self):
-        stats = index.describe_index_stats()
+        stats = self.index.describe_index_stats()
         return stats
         
 
@@ -132,6 +134,29 @@ class PineconeService:
         Delete the embeddings from the Pinecone index by message IDs
         """
         self.index.delete(ids=message_ids, namespace=address)
+
+    async def delete_by_ids_async(self, message_ids: List[str], address: str):
+        """
+        Delete the embeddings from the Pinecone index by message IDs asynchronously
+        """
+        if not message_ids:
+            logger.debug("No message IDs to delete")
+            return
+            
+        logger.debug(f"Starting async deletion of {len(message_ids)} messages for address: {address}")
+        
+        def _delete_sync():
+            try:
+                self.index.delete(ids=message_ids, namespace=address)
+                logger.debug(f"Successfully deleted {len(message_ids)} messages from Pinecone")
+            except Exception as e:
+                logger.error(f"Failed to delete messages from Pinecone: {e}")
+                raise
+        
+        # Run the synchronous delete operation in a thread pool
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _delete_sync)
 
     def rerank(self, query: str, documents: List[EmailDocument]):
         """
