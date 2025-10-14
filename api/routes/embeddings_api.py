@@ -167,6 +167,7 @@ async def query_embedding(
         # knee-point detection
         knee = len(matches)
         if len(matches) > 3:
+            # print scores to console
             kl = KneeLocator(
                 range(len(matches)),
                 [match.score for match in matches],
