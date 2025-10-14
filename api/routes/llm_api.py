@@ -33,6 +33,6 @@ async def insights(
     """
     if len(queryWithDocuments.documents) == 0:
         return { "query": queryWithDocuments.query, "results": [], "answer": "No results found" }
-    insights = llm_service.extract_insights(queryWithDocuments)
+    insights = await llm_service.extract_insights(queryWithDocuments)
     insights_json = json.loads(insights)
     return insights_json

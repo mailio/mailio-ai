@@ -1,6 +1,6 @@
 from typing import Dict
 from ..models.llm import LLMQueryWithDocuments, EmailDocument
-from openai import OpenAI
+from openai import AsyncOpenAI
 from typing import List
 import json
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
@@ -12,7 +12,8 @@ from datetime import datetime
 class LLMService:
     def __init__(self, cfg: Dict):
         self.cfg = cfg
-        self.openai = OpenAI(api_key=cfg["openai"]["api_key"])
+        # self.openai = OpenAI(api_key=cfg["openai"]["api_key"])
+        self.openai_async = AsyncOpenAI(api_key=cfg["openai"]["api_key"])
         self.model_name = cfg["openai"]["model"]
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -49,7 +50,7 @@ class LLMService:
         return {"results": scores}
 
             
-    def extract_insights(self, queryWithDocuments: LLMQueryWithDocuments):
+    async def extract_insights(self, queryWithDocuments: LLMQueryWithDocuments):
         email_content_json = [
             {
                 "id": document.id,
@@ -61,7 +62,7 @@ class LLMService:
 
         start_time = time.time()
 
-        response = self.openai.chat.completions.create(
+        response = await self.openai_async.chat.completions.create(
             model=self.model_name,
             messages=[
                 {"role": "system", "content": prompt},
