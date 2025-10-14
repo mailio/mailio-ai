@@ -20,7 +20,7 @@ WORKDIR /app
 
 # Install Redis CLI
 # USER root
-RUN apt-get update && apt-get install -y redis-tools && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y redis-tools tini && rm -rf /var/lib/apt/lists/*
 
 # Create a non-privileged user that the app will run under.
 # See https://docs.docker.com/go/dockerfile-user-best-practices/
