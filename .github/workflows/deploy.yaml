@@ -32,7 +32,7 @@ jobs:
               - 'main.py'
               - 'config.py'
               - 'logging_handler.py'
-              - 'settings.ini',
+              - 'settings.ini'
               - 'nbs/'
               - 'requirements.txt'
             sweeper:
@@ -130,6 +130,14 @@ jobs:
         run: |
           docker build \
             . --file Dockerfile-index-sweeper --tag registry.digitalocean.com/mailio/mailio-index-sweeper:${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7)
+
+      - name: Install DigitalOcean doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+    
+      - name: Log in to DigitalOcean Container Registry
+        run: doctl registry login --expiry-seconds 600
 
       - name: Push image to DigitalOcean Container Registry
         run: docker push registry.digitalocean.com/mailio/mailio-index-sweeper:${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7)

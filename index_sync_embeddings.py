@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, UTC
 from api.services.embedding_task_queue import create_metadata
 from tools.optimal_embeddings_model.data_types.email import Email
 from typing import Tuple, List
+import time
 
 # Initialize config
 cfg = get_config()
@@ -85,6 +86,7 @@ def sync_embeddings():
             logger.exception("address=%s failed during ensure_indexes/get_latest_emails: %s", address, e)
 
     logger.info("Embeddings sync finished: processed_total=%d", processed_total)
+    time.sleep(3) # sleep for 2 seconds to flush the logs
 
 if __name__ == "__main__":
     logger.info("__main__ invoked for index sync")
