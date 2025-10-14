@@ -32,7 +32,7 @@ jobs:
               - 'main.py'
               - 'config.py'
               - 'logging_handler.py'
-              - 'settings.ini',
+              - 'settings.ini'
               - 'nbs/'
               - 'requirements.txt'
             sweeper:
