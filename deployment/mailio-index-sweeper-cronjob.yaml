@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mailio-index-sweeper
+spec:
+  schedule: "0 */6 * * *"      # every 6 hours UTC
+  concurrencyPolicy: Forbid    # don't overlap runs
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1          # retry once if it fails
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: index-sweeper
+              image: <IMAGE>
+              imagePullPolicy: IfNotPresent
+              volumeMounts:
+                - name: config-volume
+                  mountPath: "/app/config.yaml"  # Mount as a file
+                  subPath: "config.yaml"  # Extract only this file
+              env:
+                - name: CONFIG_FILE
+                  value: "/app/config.yaml"  # Reference path for config file
+                - name: COUCHDB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mailio-ai-secrets
+                      key: couchdb_password
+                - name: PINECONE_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: mailio-ai-secrets
+                      key: pinecone_api_key
+                - name: REDIS_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: mailio-ai-secrets
+                      key: redis_password
+          volumes:
+            - name: config-volume
+              configMap:
+                name: mailio-ai-config  # This matches the ConfigMap name  

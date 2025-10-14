@@ -8,9 +8,45 @@ permissions:
   contents: read
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      sweeper: ${{ steps.filter.outputs.sweeper }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'deployment/01-configmap.yaml'
+              - 'deployment/02-secret.yaml'
+              - 'deployment/03-deployment.yaml'
+              - 'deployment/04-poddisruptionbudget.yaml'
+              - '.dockerignore'
+              - 'Dockerfile'
+              - 'api/'
+              - 'main.py'
+              - 'config.py'
+              - 'logging_handler.py'
+              - 'settings.ini',
+              - 'nbs/'
+              - 'requirements.txt'
+            sweeper:
+              - 'index_sync_embeddings.py'
+              - 'Dockerfile-index-sweeper'
+              - 'requirements.txt'
+              - 'deployment/mailio-index-sweeper-cronjob.yaml'
+
   deploy-web-app:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     steps:
+      - run: echo "deploying web app..."
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -67,3 +103,52 @@ jobs:
 
       - name: Verify deployment
         run: kubectl get ds
+
+  deploy-index-sweeper:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sweeper == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "deploying index sweeper..."
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: UPDATE SHA
+        run: echo $GITHUB_SHA > $GITHUB_WORKSPACE/_meta
+
+      - name: Set env to test
+        if: endsWith(github.ref, '/test')
+        run: |
+          echo "ENVIRONMENT=test" >> $GITHUB_ENV
+
+      - name: Set env to production
+        if: endsWith(github.ref, '/production')
+        run: |
+          echo "ENVIRONMENT=production" >> $GITHUB_ENV
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            . --file Dockerfile-index-sweeper --tag registry.digitalocean.com/mailio/mailio-index-sweeper:${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7)
+
+      - name: Push image to DigitalOcean Container Registry
+        run: docker push registry.digitalocean.com/mailio/mailio-index-sweeper:${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7)
+
+      - name: Update deployment file
+        run: TAG=${ENVIRONMENT}-$(echo $GITHUB_SHA | head -c7) && sed -i 's|<IMAGE>|registry.digitalocean.com/mailio/mailio-index-sweeper:'${TAG}'|' $GITHUB_WORKSPACE/deployment/mailio-index-sweeper-cronjob.yaml
+
+      - name: Save DigitalOcean kubeconfig (production)
+        if: endsWith(github.ref, '/production')
+        run: |
+          doctl kubernetes cluster kubeconfig save mail-io
+
+      - name: Save DigitalOcean kubeconfig (test)
+        if: endsWith(github.ref, '/test')
+        run: |
+          doctl kubernetes cluster kubeconfig save mailio-io
+
+      - name: Deploy to DigitalOcean Kubernetes
+        run: kubectl apply -f $GITHUB_WORKSPACE/deployment/mailio-index-sweeper-cronjob.yaml
+
+      - name: Verify deployment
+        run: kubectl get cronjob
