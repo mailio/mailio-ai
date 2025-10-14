@@ -22,3 +22,4 @@ loguru==0.7.3
 lark==1.2.2
 email-validator
 kneed==0.8.5
+google-cloud-logging==3.12.1

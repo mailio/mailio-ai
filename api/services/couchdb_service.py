@@ -10,6 +10,7 @@ from tools.optimal_embeddings_model.mailio_ai_libs.collect_emails import extract
 import threading
 import traceback
 import urllib.parse
+import time
 
 logger = use_logginghandler()
 
@@ -39,7 +40,6 @@ class CouchDBService:
         auth = BasicAuthenticator(couch_cfg.get("username"), couch_cfg.get("password"))
         client = CloudantV1(authenticator=auth)
         client.set_service_url(couch_cfg.get("host"))
-        client.set_disable_ssl_verification(True)
         self.client = client
 
     def get_db(self, db_name:str):
@@ -53,7 +53,7 @@ class CouchDBService:
         db = self.client.get_database_information(db=db_name)
         return db
 
-    def message_to_email(self, doc:dict) -> Email:
+    def message_to_email(self, doc:dict, skip_non_smtp: bool = False) -> Email:
         """
         Convert a message to an Email object. It also clears up the HTML tags 
         and chunks the email body into paragraphs suitable for ML processing (embeddings)
@@ -64,8 +64,10 @@ class CouchDBService:
         """
         msg_type = extract_message_type(doc)
 
-        # skip encrypted emails, list only SMTP emails
+        # list only SMTP emails
         if msg_type is None or msg_type != "application/mailio-smtp+json":
+            if skip_non_smtp:
+                return None
             folder = extract_folder(doc)
             message_id = extract_message_id(doc)
             created = extract_created(doc)
@@ -226,3 +228,128 @@ class CouchDBService:
 
         return messages, missing
 
+    def get_all_subscribed_users(self) -> List[str]:
+        """
+        Get all subscribed users
+        """
+        response = self.client.post_all_docs(
+            db='subscription',
+            include_docs=True,
+            limit=100
+        ).get_result()
+
+        users = []
+        for row in response.get("rows", []):
+            doc = row.get("doc")
+            if doc.get("stripeSubscriptionPlan") is not None:
+                users.append(doc.get("address"))
+        return users
+
+    def get_latest_emails(self, address: str, from_epoch_ms: int) -> Tuple[List[dict], List[Email]]:
+        """
+        Get the latest emails for a user
+        Args:
+            address: str: The address of the user
+            from_epoch_ms: int: The epoch time to get emails from
+        Returns:
+            Tuple[List[dict], List[Email]]: messages = raw docs for update later, Email specific objects for embedding
+        """
+        FIXED_FOLDERS = ["inbox", "sent", "archive", "goodreads"]
+        selector = {
+        "$and": [
+            {"folder": {"$in": FIXED_FOLDERS}},
+            {
+                "$or": [
+                    {"search": {"$exists": False}},
+                    {"search": {"$eq": ""}},
+                        {"search": {"$eq": None}},
+                    ]
+                },
+                {"created": {"$gte": from_epoch_ms}},
+            ]
+        }
+        db_name = self.address_to_db_name(address)
+        latest_emails = []
+        messages = []
+        bookmark = None
+        page = 0
+        while True:
+            response = self.client.post_find(
+                db=db_name,
+                selector=selector,
+                limit=100,
+                bookmark=bookmark,
+                use_index=["ddoc_search_emb_indices", "idx_folder_created_pfs"]
+            ).get_result()
+            docs = response.get("docs", [])
+            if not docs:
+                break
+            
+            # Filter out None emails and keep corresponding messages
+            filtered_messages = []
+            filtered_emails = []
+            for doc in docs:
+                email = self.message_to_email(doc, skip_non_smtp=True)
+                if email is not None:
+                    filtered_messages.append(doc)
+                    filtered_emails.append(email)
+            
+            messages.extend(filtered_messages)
+            latest_emails.extend(filtered_emails)
+            bookmark = response.get("bookmark")
+            if not bookmark:
+                break
+            page += 1
+
+        return messages, latest_emails
+
+    def ensure_indexes(self, address: str = None) -> bool:
+        """
+        Ensure indexes are created
+        Returns:
+            bool: True if indexes are created, False otherwise
+        """
+        if not address:
+            raise ValueError("Address is required")
+
+        INDEX_NAME = "idx_folder_created_pfs"
+        
+        # create index for created field
+        db_name = self.address_to_db_name(address)
+        desired_fields = [{"folder": "asc"}, {"created": "asc"}]
+        idxs = self.client.get_indexes_information(db=db_name).get_result().get("indexes", [])
+        for idx in idxs:
+            if idx.get("type") != "json":
+                continue
+            if idx.get("name") == INDEX_NAME and idx.get("def", {}).get("fields") == desired_fields:
+                # already good
+                return True
+        
+        # create index
+        try:
+            FIXED_FOLDERS = ["inbox", "sent", "archive", "goodreads"]
+            pfs_selector = {"folder": {"$in": FIXED_FOLDERS}}
+            self.client.post_index(
+                db=db_name,
+                ddoc="ddoc_search_emb_indices",     # stable design doc name
+                name=INDEX_NAME,
+                type="json",
+                index={"fields": desired_fields, "partial_filter_selector": pfs_selector},
+            )
+            return True
+        except ApiException as e:
+            if e.status_code == 400:
+                logger.error(f"Error creating index: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return False
+            if e.status_code == 401 or e.status_code == 403:
+                logger.error(f"Unauthorized error creating index: {e}")
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                return False
+            logger.error(f"Error creating index: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error creating index: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return False

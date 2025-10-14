@@ -60,6 +60,7 @@ app.state.pinecone_service = PineconeService(cfg, dimension=app.state.embedding_
 app.state.embedding_task_queue = EmbeddingTaskQueue(cfg)
 app.state.llm_service = LLMService(cfg)
 
+
 app.include_router(main_router)
 
 EXCEPTION_LOG_LEVELS = {
