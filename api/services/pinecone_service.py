@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 import time
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from ..models.llm import LLMQueryWithDocuments, EmailDocument
+from ..models.llm import EmailDocument
 from loguru import logger
 
 class PineconeService:
