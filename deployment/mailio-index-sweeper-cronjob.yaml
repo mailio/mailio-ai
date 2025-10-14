@@ -13,6 +13,8 @@ spec:
       template:
         spec:
           restartPolicy: Never
+          imagePullSecrets:
+            - name: registry-mailio  # Secret containing registry credentials
           containers:
             - name: index-sweeper
               image: <IMAGE>
@@ -21,6 +23,9 @@ spec:
                 - name: config-volume
                   mountPath: "/app/config.yaml"  # Mount as a file
                   subPath: "config.yaml"  # Extract only this file
+                - name: secret-volume
+                  mountPath: /app/secrets
+                  readOnly: true
               env:
                 - name: CONFIG_FILE
                   value: "/app/config.yaml"  # Reference path for config file
@@ -43,3 +48,6 @@ spec:
             - name: config-volume
               configMap:
                 name: mailio-ai-config  # This matches the ConfigMap name  
+            - name: secret-volume
+              secret:
+                secretName: mailio-ai-secrets
