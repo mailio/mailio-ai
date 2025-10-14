@@ -72,14 +72,11 @@ def sync_embeddings():
 
                     # remove from metadata all fields with None 
                     metadata = {k: v for k, v in metadata.items() if v is not None}
-                    print(f"upserting message_id={message_id} rev={message.get('_rev')} metadata={metadata} vector={vector[0].tolist()}")
-                    # pinecone_service.upsert(address, message_id, vector[0].tolist(), metadata)
+                    pinecone_service.upsert(address, message_id, vector[0].tolist(), metadata)
 
                     # after successfull upsert, update the message with flag: search: true
                     message["search"] = True
-                    # couchdb_service.put_message(message, address)
-                    print(f"upserted message_id={message_id} rev={message.get('_rev')}")
-                    # pinecone_service.upsert_email(email, emb)
+                    couchdb_service.put_message(message, address)
                     processed_total += 1
                     logger.debug("upserted message_id=%s rev=%s", getattr(email, "message_id", None), getattr(email, "_rev", None))
                 except Exception as e:
