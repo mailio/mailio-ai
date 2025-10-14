@@ -9,5 +9,5 @@ router = APIRouter()
 async def health_check(config: Dict = Depends(get_config)):
     return {
         "status": "ok",
-        "version": config.get("version", "0.0.3")
+        "version": config.get("version", "0.0.4")
     }
