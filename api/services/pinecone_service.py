@@ -4,7 +4,7 @@ from typing import Dict, List
 from pinecone.db_data.models import QueryResponse
 from urllib.parse import urlparse
 import time
-from ..models.llm import LLMQueryWithDocuments, EmailDocument
+from ..models.llm import EmailDocument
 from loguru import logger
 
 class PineconeService:
