@@ -76,10 +76,10 @@ class LLMService:
 
         return response.choices[0].message.content
 
-    def selfquery(self, query: str):
+    async def selfquery(self, query: str):
         today = datetime.now().strftime("%Y-%m-%d")
         formatted_prompt = selfquery_prompt.format(today=today)
-        response = self.openai.chat.completions.create(
+        response = await self.openai_async.chat.completions.create(
             model=self.model_name,
             messages=[{"role": "system", "content": formatted_prompt}, {"role": "user", "content": query}],
             response_format={"type": "json_object"}

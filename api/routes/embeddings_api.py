@@ -131,7 +131,7 @@ async def query_embedding(
     try:
         short_query = query
         try:
-            result = llm_service.selfquery(query)
+            result = await llm_service.selfquery(query)
             result_json = json.loads(result)
             logger.debug(f"LLM result JSON: {result_json}")
             short_query = result_json.get("query", query)
