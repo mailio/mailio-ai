@@ -2,8 +2,8 @@ from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 class EmbeddingMetadata(BaseModel):
-    folder: str
-    from_email: str
+    folder: Optional[str] = None
+    from_email: Optional[str] = None
     subject: Optional[str] = None
     from_name: Optional[str] = None
     vector: Optional[List[float]] = None
@@ -14,6 +14,7 @@ class EmbeddingMatch(BaseModel):
     score: Optional[float] = None
     created: Optional[int] = None
     metadata: Optional[EmbeddingMetadata] = None
+    text: Optional[str] = None
 
 class EmbeddingResponse(BaseModel):
     address: str

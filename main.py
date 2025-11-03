@@ -2,12 +2,9 @@ from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
-import uvicorn
 from contextlib import asynccontextmanager
 
 from logging_handler import use_logginghandler
-import datetime
-import argparse
 import sys
 from enum import Enum
 from api.services.couchdb_service import CouchDBService

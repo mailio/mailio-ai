@@ -116,6 +116,10 @@ class PineconeService:
             query_filter = None
 
         logger.debug(f"query_filter: {query_filter}")
+        logger.debug(f"query vector: {query_embedding}")
+        logger.debug(f"top_k: {top_k}")
+        logger.debug(f"namespace: {address}")
+        logger.debug(f"include_metadata: True")
 
         results = self.index.query(vector=query_embedding, filter=query_filter, top_k=top_k, namespace=address, include_metadata=True)
 

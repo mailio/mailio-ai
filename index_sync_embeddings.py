@@ -42,6 +42,7 @@ def list_latest_emails(address: str) -> Tuple[List[dict], List[Email]]:
     three_months_ago = datetime.now(UTC) - timedelta(days=90)
     epoch_ms = int(three_months_ago.timestamp() * 1000)
 
+    # returns latest emails while skipping emails that have search=True and filters out non smtp emails
     messages, latest_emails = couchdb_service.get_latest_emails(address, epoch_ms)
     logger.info("address=%s latest_emails=%d since=%s", address, len(latest_emails), three_months_ago.isoformat())
     return messages, latest_emails

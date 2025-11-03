@@ -185,7 +185,7 @@ class CouchDBService:
                 raise UnauthorizedError()
             raise e
 
-    def get_bulk_by_id(self, address:str, ids:List[str]) -> Tuple[List[Email], List[str]]:
+    def get_bulk_by_id(self, address:str, ids:List[str], sort:str = "NO_SORT") -> Tuple[List[Email], List[str]]:
         """
         Get a list of messages by their IDs
         Args:
@@ -197,16 +197,16 @@ class CouchDBService:
             return []
         
         messages = []
+        missing: List[str] = []
         doc_ids = []
         for _id in ids:
             escaped_id = _id.replace("+", " ") # i don't know what exactly couchdb does but i know it doesn't like + in there
             doc = BulkGetQueryDocument(id=escaped_id)
             doc_ids.append(doc)
         
-        missing: List[str] = []
         try:
             db_name = self.address_to_db_name(address)
-            bulk_get_results = self.client.post_bulk_get(db=db_name, docs=doc_ids, latest=True, revs=False).get_result()
+            bulk_get_results = self.client.post_bulk_get(db=db_name, docs=doc_ids, attachments=False, latest=True, revs=False).get_result()
             for result in bulk_get_results.get("results", []):
                 got_ok = False
                 for entry in result.get("docs", []):
@@ -225,6 +225,12 @@ class CouchDBService:
             if e.status_code == 401 or e.status_code == 403:
                 raise UnauthorizedError()
             raise e
+
+        if sort != "NO_SORT":
+            if sort == "asc":
+                messages.sort(key=lambda x: x.created, reverse=False)
+            else:
+                messages.sort(key=lambda x: x.created, reverse=True)
 
         return messages, missing
 
