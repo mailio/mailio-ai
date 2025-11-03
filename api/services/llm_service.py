@@ -78,7 +78,7 @@ class LLMService:
 
     async def selfquery(self, query: str):
         today = datetime.now().strftime("%Y-%m-%d")
-        formatted_prompt = selfquery_prompt.format(today=today)
+        formatted_prompt = selfquery_prompt.substitute(today=today)
         response = await self.openai_async.chat.completions.create(
             model=self.model_name,
             messages=[{"role": "system", "content": formatted_prompt}, {"role": "user", "content": query}],

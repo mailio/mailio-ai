@@ -21,6 +21,8 @@ from typing import List
 import traceback
 from api.utils.query_composer import QueryComposer
 from kneed import KneeLocator
+import datetime
+from api.models.llm import EmailDocument
 
 router = APIRouter()
 
@@ -130,6 +132,7 @@ async def query_embedding(
     """
     try:
         short_query = query
+        pinecone_filter = {"sort": "NO_SORT", "timestampBefore": None, "timestampAfter": None, "fromEmail": None}
         try:
             result = await llm_service.selfquery(query)
             result_json = json.loads(result)
@@ -137,9 +140,14 @@ async def query_embedding(
             short_query = result_json.get("query", query)
             if short_query == "":
                 short_query = query
+            short_query = "query: " + short_query
 
             query_composer = QueryComposer()
             pinecone_filter = query_composer.compose(result_json)
+            if pinecone_filter.sort == "NO_SORT" or pinecone_filter.sort is None or pinecone_filter.sort == "":
+                print("no sort")
+            else:
+                print(f"sorting by created {pinecone_filter.sort}")
             beforeTimestamp = pinecone_filter.timestampBefore
             afterTimestamp = pinecone_filter.timestampAfter
             from_email = pinecone_filter.fromEmail
@@ -147,15 +155,29 @@ async def query_embedding(
         except Exception as e:
             logger.debug(f"Exception: {e}")
             logger.debug(f"Traceback: {traceback.format_exc()}")
-            logger.debug(f"LLM result JSON: {result_json}")
+            # logger.debug(f"LLM result JSON: {result_json}")
 
-        vector = embedding_service.embedder.embed([short_query])
+        vector = embedding_service.embedder.embed(short_query)
         
         # query embedding
+        search_top_number = top_k
+        if pinecone_filter.sort is None or pinecone_filter.sort == "" or pinecone_filter.sort == "NO_SORT":
+            search_top_number = top_k * 5
+        elif pinecone_filter.sort == "desc":
+            # since we are sorting by desc, we need to search for the most recent messages
+            # we will search for the most recent 90 days
+            afterTimestamp = int(datetime.datetime.now().timestamp() * 1000 - (90 * 24 * 60 * 60 * 1000))
+            search_top_number = 300
+        elif pinecone_filter.sort == "asc":
+            # since we are sorting by asc, we need to search for the oldest messages
+            # we will skip today's messages
+            beforeTimestamp = int(datetime.datetime.now().timestamp() * 1000 - (1 * 24 * 60 * 60 * 1000))
+            search_top_number = 1000
+        
         response = pinecone_service.query(
             address=address, 
-            query_embedding=vector[0].tolist(), 
-            top_k=top_k * 5, # 5 times more results than requested (to account for filtering and sorting)
+            query_embedding=vector.tolist(), 
+            top_k=search_top_number, # 5 times more results than requested (to account for filtering and sorting)
             folder=folder, 
             beforeTimestamp=beforeTimestamp, 
             afterTimestamp=afterTimestamp, 
@@ -181,13 +203,14 @@ async def query_embedding(
         all_ids = [match.id for match in matches]
         
         # retrieve all document by id from the couch database (for display purposes)
-        emails, missing_ids = couchdb_service.get_bulk_by_id(address, all_ids)
-        if missing_ids:
-            logger.debug(f"missing ids in database: {missing_ids}") 
-            asyncio.create_task(pinecone_service.delete_by_ids_async(missing_ids, address))
-            logger.debug(f"deleted {len(missing_ids)} messages from Pinecone")
-            
-        email_dict = {email.message_id: email for email in emails if email is not None}
+        if len(all_ids) > 0:
+            emails, missing_ids = couchdb_service.get_bulk_by_id(address, all_ids, pinecone_filter.sort)
+            if missing_ids:
+                logger.debug(f"missing ids in database: {missing_ids}") 
+                asyncio.create_task(pinecone_service.delete_by_ids_async(missing_ids, address))
+                logger.debug(f"deleted {len(missing_ids)} messages from Pinecone")
+
+            email_dict = {email.message_id: email for email in emails if email is not None}
 
         for match in matches:
             match_id = match.id.replace("+", " ") # i don't know what exactly couchdb does but i know it doesn't like + in there
@@ -213,6 +236,35 @@ async def query_embedding(
 
         # clip results to top_k
         output_matches = output_matches[:top_k]
+
+        # rerank here
+        if len(output_matches) > 3:
+            email_docs = {}
+            # collect top_k output matches as email documents
+            for match in output_matches:
+                if match.message_id in email_dict:
+                    email = email_dict[match.message_id]
+                    if email.subject is None and (email.sentences is None or len(email.sentences) == 0):
+                        continue
+                    email_docs[match.message_id] = EmailDocument(
+                        id=match.message_id,
+                        text=".".join(email.sentences),
+                        score=match.score
+                    )
+                
+            reranked_results = pinecone_service.rerank(query, list[EmailDocument](email_docs.values()))    # convert to list to avoid type error
+            score_lookup_map = {result["id"]: result["score"] for result in reranked_results["results"]}
+            # overwrite scores in output_matches
+            for match in output_matches:
+                if match.message_id in score_lookup_map:
+                    match.score = score_lookup_map[match.message_id]
+                    # clip sentences to 200 characters
+                    if email_docs[match.message_id] is not None:
+                        if len(email_docs[match.message_id].text) > 200:
+                            match.text = email_docs[match.message_id].text[:200]
+                        else:
+                            match.text = email_docs[match.message_id].text
+            output_matches = sorted(output_matches, key=lambda m: m.score, reverse=True)
 
         resp:EmbeddingResponse = EmbeddingResponse(
             address=address,

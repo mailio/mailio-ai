@@ -29,29 +29,26 @@ class EmbeddingService:
         self.embedder = Embedder(self.model, self.tokenizer)    
     
 
-    def create_sentence_list(self, email: Email) -> List[str]:
+    def create_passage_text(self, email: Email) -> str:
         """
-        Create a list of sentences for the email
+        Create a passage text for the email
         Args:
-            email: Email: The email to create sentences for
+            email: Email: The email to create passage text for
         
         Returns:
-            List[str]: The list of sentences for the email
+            str: The passage text for the email
         """
-        text = []
-        # add sender  
-        sender = "Email from: " + email.sender_email
-        if email.sender_name:
-            sender = f"Email from:{email.sender_name} <{email.sender_email}>" 
-        text.append(sender)
-
+        text = ""
+       
         # add subject
+        text += "passage: "
         if email.subject:
-            text.append("Subject: " + email.subject)
+            text += "Subject: " + email.subject
 
         # append content
         if len(email.sentences) > 0:
-            text.extend(email.sentences)
+            sentences_text = "Body: " + ".".join(email.sentences)
+            text += "\n" + sentences_text
 
         return text
 
@@ -83,6 +80,6 @@ class EmbeddingService:
         Returns:
             torch.Tensor: The embeddings for the email
         """
-        text = self.create_sentence_list(email)
+        text = self.create_passage_text(email)
         embeddings = self.embedder.embed(text)
         return embeddings
