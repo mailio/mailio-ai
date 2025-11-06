@@ -91,7 +91,7 @@ def sync_embeddings():
 
                     # remove from metadata all fields with None 
                     metadata = {k: v for k, v in metadata.items() if v is not None}
-                    pinecone_service.upsert(address, message_id, vector[0].tolist(), metadata)
+                    pinecone_service.upsert(address, message_id, vector.tolist(), metadata)
 
                     # after successfull upsert, update the message with flag: search: true
                     message["search"] = True
@@ -101,7 +101,8 @@ def sync_embeddings():
                 except Exception as e:
                     logger.exception("address=%s message_id=%s embed/upsert failed: %s", address, getattr(email, "message_id", None), e)
         except Exception as e:
-            logger.exception("address=%s failed during ensure_indexes/get_latest_emails: %s", address, e)
+            import traceback
+            logger.error("address=%s failed during ensure_indexes/get_latest_emails: %s", address, traceback.format_exc())
 
     logger.info("Embeddings sync finished: processed_total=%d", processed_total)
     time.sleep(4) # sleep for 2 seconds to flush the logs

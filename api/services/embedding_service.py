@@ -2,8 +2,8 @@ from transformers import AutoTokenizer, AutoModel
 from tools.optimal_embeddings_model.data_types.email import Email, MessageType
 from tools.optimal_embeddings_model.mailio_ai_libs.create_embeddings import Embedder
 import torch
-from typing import List, Dict
-import threading
+import numpy as np
+from typing import List
 
 class EmbeddingService:
     """
@@ -71,7 +71,7 @@ class EmbeddingService:
 
         return embeddings
 
-    def create_embedding(self, email:Email) -> torch.Tensor:
+    def create_embedding(self, email:Email) -> np.ndarray:
         """
         Create embeddings for the email
         Args:

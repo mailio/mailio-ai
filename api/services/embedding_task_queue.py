@@ -100,7 +100,7 @@ def create_embedding(cfg:Dict):
 
                     # remove from metadata all fields with None 
                     metadata = {k: v for k, v in metadata.items() if v is not None}
-                    pc_service.upsert(address, message_id, vector[0].tolist(), metadata)
+                    pc_service.upsert(address, message_id, vector.tolist(), metadata)
 
                     # after successfull upsert, update the message with flag: search: true
                     message["search"] = True
