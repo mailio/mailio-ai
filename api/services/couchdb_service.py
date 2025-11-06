@@ -360,13 +360,13 @@ class CouchDBService:
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
-    def get_mailio_mapping(self, address: str) -> str:
+    def get_mailio_mapping(self, address: str) -> dict:
         """
-        Get the mailio mapping for an address
+        Get the mailio mapping for an address (new address)
         Args:
-            address: str: The address to get the mapping for
+            address: str: The new address to get the mapping for
         Returns:
-            str: The mailio mapping
+            dict: The mailio mapping document
         """
         db_name = "mailio_mapping"
         response = self.client.post_find(
