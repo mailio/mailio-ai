@@ -28,7 +28,7 @@ def list_subscribers():
     List all subscribers
     """
     subs = couchdb_service.get_all_subscribed_users()
-    logger.info("Fetched %d subscribed users", len(subs))
+    logger.info(f"Fetched {len(subs)} subscribed users")
     return subs
 
 def list_latest_emails(address: str) -> Tuple[List[dict], List[Email]]:
@@ -65,7 +65,7 @@ def sync_embeddings():
     for address in subscribers:
         logger.info("Processing subscriber address=%s", address)
         try:
-            # TODO! check for legacy address
+            # check for legacy address
             try:
                 mapping = couchdb_service.get_mailio_mapping(address)
                 if mapping:
