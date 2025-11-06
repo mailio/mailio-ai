@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, UTC
 from api.services.embedding_task_queue import create_metadata
 from tools.optimal_embeddings_model.data_types.email import Email
 from typing import Tuple, List
+from logging_handler import use_logginghandler
 import time
 
 # Initialize config
@@ -20,7 +21,7 @@ embedding_service = EmbeddingService(cfg)
 configure_logging(cfg)
 
 # Module-scoped logger
-logger = logging.getLogger(__name__)
+logger = use_logginghandler()
 
 def list_subscribers():
     """
@@ -64,6 +65,21 @@ def sync_embeddings():
     for address in subscribers:
         logger.info("Processing subscriber address=%s", address)
         try:
+            # TODO! check for legacy address
+            try:
+                mapping = couchdb_service.get_mailio_mapping(address)
+                if mapping:
+                    if "legacyAddress" in mapping:
+                        address = mapping.get("legacyAddress")
+                        logger.info("Found legacy address=%s for address=%s", address, mapping.get("legacyAddress", "unknown"))
+            except Exception as e:
+                logger.exception("Failed to get mailio mapping for address=%s: %s", address, e)
+            if address is None:
+                logger.warning("No legacy address found for address=%s, skipping", address)
+                continue
+            if not address.startswith("0x"):
+                logger.warning("Address=%s is not a valid legacy address, skipping", address)
+                continue
             couchdb_service.ensure_indexes(address)
             messages, latest_emails = list_latest_emails(address)
             for message, email in zip(messages, latest_emails):

@@ -359,3 +359,26 @@ class CouchDBService:
             logger.error(f"Unexpected error creating index: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False
+
+    def get_mailio_mapping(self, address: str) -> str:
+        """
+        Get the mailio mapping for an address
+        Args:
+            address: str: The address to get the mapping for
+        Returns:
+            str: The mailio mapping
+        """
+        db_name = "mailio_mapping"
+        response = self.client.post_find(
+            db=db_name,
+            selector={
+                "address": {
+                    "$eq": address
+                }
+            },
+            use_index=["mapping-address-index"]
+        ).get_result()
+        docs = response.get("docs", [])
+        if not docs:
+            return None
+        return docs[0]
