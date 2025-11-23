@@ -105,7 +105,7 @@ def sync_embeddings():
             logger.error("address=%s failed during ensure_indexes/get_latest_emails: %s", address, traceback.format_exc())
 
     logger.info("Embeddings sync finished: processed_total=%d", processed_total)
-    time.sleep(3) # sleep for 2 seconds to flush the logs
+    time.sleep(4) # sleep for 2 seconds to flush the logs
 
 if __name__ == "__main__":
     logger.info("__main__ invoked for index sync")
