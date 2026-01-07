@@ -158,8 +158,8 @@ async def query_embedding(
             from_email = pinecone_filter.fromEmail
 
         except Exception as e:
-            logger.debug(f"Exception: {e}")
-            logger.debug(f"Traceback: {traceback.format_exc()}")
+            logger.error(f"Error composing query: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             # logger.debug(f"LLM result JSON: {result_json}")
 
         vector = embedding_service.embedder.embed(short_query)
