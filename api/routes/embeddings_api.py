@@ -279,7 +279,8 @@ async def query_embedding(
         )
         return resp
     except NotFoundError as e:
-        logger.debug(f"Not found error: {e}")
+        # logger.debug(f"Not found error: {e}")
+        logger.error(f"Not found error: {e}")
         resp:EmbeddingResponse = EmbeddingResponse(
             address=address,
             matches=[],
@@ -287,8 +288,10 @@ async def query_embedding(
         )
         return resp
     except Exception as e:
-        logger.debug(f"Exception: {e}")
-        logger.debug(f"Traceback: {traceback.format_exc()}")
+        # logger.debug(f"Exception: {e}")
+        # logger.debug(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Exception: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
