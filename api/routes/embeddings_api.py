@@ -19,7 +19,7 @@ from loguru import logger
 import json
 from typing import List
 import traceback
-from api.utils.query_composer import QueryComposer
+from api.utils.query_composer import QueryComposer, QueryParams
 from kneed import KneeLocator
 import datetime
 from api.models.llm import EmailDocument
@@ -132,7 +132,12 @@ async def query_embedding(
     """
     try:
         short_query = query
-        pinecone_filter = {"sort": "NO_SORT", "timestampBefore": None, "timestampAfter": None, "fromEmail": None}
+        # pinecone_filter:QueryParams = {"sort": "NO_SORT", "timestampBefore": None, "timestampAfter": None, "fromEmail": None}
+        pinecone_filter:QueryParams = QueryParams()
+        pinecone_filter.sort = "NO_SORT"
+        pinecone_filter.timestampBefore = None
+        pinecone_filter.timestampAfter = None
+        pinecone_filter.fromEmail = None
         try:
             result = await llm_service.selfquery(query)
             result_json = json.loads(result)
@@ -144,7 +149,7 @@ async def query_embedding(
 
             query_composer = QueryComposer()
             pinecone_filter = query_composer.compose(result_json)
-            if pinecone_filter.sort == "NO_SORT" or pinecone_filter.sort is None or pinecone_filter.sort == "":
+            if pinecone_filter.sort == "NO_SORT":
                 print("no sort")
             else:
                 print(f"sorting by created {pinecone_filter.sort}")
@@ -161,7 +166,7 @@ async def query_embedding(
         
         # query embedding
         search_top_number = top_k
-        if pinecone_filter.sort is None or pinecone_filter.sort == "" or pinecone_filter.sort == "NO_SORT":
+        if pinecone_filter is None or pinecone_filter.sort is None or pinecone_filter.sort == "" or pinecone_filter.sort == "NO_SORT":
             search_top_number = top_k * 5
         elif pinecone_filter.sort == "desc":
             # since we are sorting by desc, we need to search for the most recent messages
